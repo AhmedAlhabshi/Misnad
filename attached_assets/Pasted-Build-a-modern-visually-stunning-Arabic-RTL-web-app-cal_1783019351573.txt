@@ -1,0 +1,193 @@
+Build a modern, visually stunning Arabic RTL web app called "مِسناد" (Misnad) — an AI-powered contract analyzer for everyday Saudi users. The app analyzes financial contracts (car loans, credit cards, insurance, subscriptions) and explains them in plain human language.
+
+## Design Vision
+
+**Aesthetic:** Dark-first glassmorphism with warm gradient accents. Think: a premium fintech app that feels trustworthy and intelligent. Deep navy/slate dark background (#0D1117) with glowing gradient blobs behind cards. Cards use frosted glass effect (backdrop-filter blur). Accent color is a warm amber-to-orange gradient (#F59E0B → #EF4444) for risk indicators, and a cool indigo-to-purple gradient (#6366F1 → #8B5CF6) for primary actions and branding.
+
+**Typography:** Use `font-family: 'Cairo', sans-serif` (Google Fonts) for Arabic. Large bold headings, lightweight body text. Direction is RTL throughout (`dir="rtl"`).
+
+**Micro-interactions:** Smooth page transitions (200ms ease). Cards animate in with a subtle fade+slide-up (staggered 50ms delay each). Progress bars animate on mount. Risk score ring animates counting up. Hover states on all interactive elements scale slightly (`transform: scale(1.02)`).
+
+**Round widgets:** Use heavily rounded corners everywhere (`border-radius: 20px` for cards, `50px` for pills/chips, full circles for icons). No sharp corners anywhere except dividers.
+
+**Icons:** Use Lucide React icons throughout. All icons inside circular or rounded-square icon containers with gradient backgrounds.
+
+## Color Tokens (use as CSS variables)
+
+```
+--bg-primary: #0D1117
+--bg-secondary: #161B22
+--bg-card: rgba(255,255,255,0.05)
+--border-card: rgba(255,255,255,0.08)
+--gradient-brand: linear-gradient(135deg, #6366F1, #8B5CF6)
+--gradient-danger: linear-gradient(135deg, #EF4444, #F97316)
+--gradient-warning: linear-gradient(135deg, #F59E0B, #EAB308)
+--gradient-success: linear-gradient(135deg, #10B981, #059669)
+--text-primary: #F0F6FC
+--text-secondary: #8B949E
+--text-muted: #484F58
+```
+
+## App Structure — 4 Screens
+
+### Screen 1: Home / Upload
+
+Layout: centered single-column, max-width 480px, dark background.
+
+**Top bar:**
+- Right: Logo "مِسناد" in bold white + Arabic subtitle "افهم عقودك قبل التوقيع" in muted text
+- Left: A small rounded pill badge "AI مدعوم بـ" with a sparkle icon, indigo gradient background
+
+**Upload zone (main card):**
+- Glassmorphism card with subtle border (1px rgba white 0.1)
+- Large upload icon inside a gradient circle (indigo→purple)
+- Title: "ارفع عقدك" bold white
+- Subtitle: "PDF أو صورة — نحلله في ثوانٍ" muted
+- Dashed border animated (CSS dash animation, slow 8s loop)
+- On hover: border glows with indigo color
+
+**Contract type chips** (rounded pills): 6 chips in a wrapping flex row:
+- 🚗 تمويل سيارة
+- 💳 بطاقة ائتمانية
+- 🏠 تمويل عقاري
+- 📱 اشتراك
+- 🛡️ تأمين
+- 📄 عقد عمل
+
+Each chip: dark glass background, white border (0.5px), white text. Selected state: indigo→purple gradient background, white text, no border.
+
+**Primary CTA button:** Full width, tall (52px), indigo→purple gradient, rounded-full (`border-radius: 50px`), white bold text "تحليل العقد", sparkle icon on right. Glow shadow on hover (`box-shadow: 0 0 30px rgba(99,102,241,0.5)`).
+
+**Privacy note at bottom:** Small row with a shield icon (green), text: "ملفك لا يُخزّن — يُحلّل ويُحذف فوراً" in muted small text.
+
+### Screen 2: Loading / Analysis
+
+Full screen, centered, dark background.
+
+**Animated brain/scan visual:** A large circular progress ring (SVG, stroke-dasharray animated) showing scanning progress. Inside: rotating scan line animation over a document icon. Indigo→purple gradient on the ring stroke.
+
+**Step list** below: 4 steps stacking vertically with animated states:
+- ✅ Done state: green check icon in circle, green text, strikethrough
+- 🔄 Active state: spinning loader icon, indigo text, indigo pill background
+- ⏳ Pending state: clock icon, muted text
+
+Steps:
+1. "قراءة الوثيقة"
+2. "تحليل البنود"
+3. "كشف المخاطر"
+4. "إعداد التقرير"
+
+Animated progress: each step completes every ~800ms with a checkmark pop animation (scale 0 → 1.2 → 1).
+
+**Tip card at bottom:** Glassmorphism card showing a random tip like "هل تعلم؟ 68% من الناس لا يقرؤون عقودهم كاملاً" with a lightbulb icon.
+
+### Screen 3: Analysis Results (Main Screen)
+
+Split into scrollable sections. This is the hero screen. It contains **two tabs**: "📊 نظرة عامة" (Overview) and "📄 العقد المُعلَّم" (Highlighted Contract — see Feature 1 below).
+
+**Header section:**
+- Contract title (e.g., "عقد تمويل سيارة — البنك الأهلي") bold white
+- Risk pill widget: a large rounded pill showing risk level with gradient:
+  - High risk: red→orange gradient pill, pulsing glow animation
+  - Medium risk: amber→yellow gradient
+  - Low risk: green→teal gradient
+- Risk score: a circular gauge widget (donut chart style, SVG) showing score like "74/100 — مرتفع" with animated fill on load
+
+**Summary stats row** — 4 round widgets: A horizontal scroll row of 4 glassmorphism cards, each perfectly square (`aspect-ratio: 1`), with:
+- Icon in gradient circle at top
+- Large bold number/value
+- Small label below
+
+Cards:
+- 📅 icon (calendar) — "60 شهر" — "مدة العقد"
+- 💰 icon (coins) — "142,000 ر" — "إجمالي التكلفة"
+- 📊 icon (trending-up) — "18.4%" — "نسبة الفائدة"
+- ⚠️ icon (alert-triangle) — "3" — "بنود خطيرة"
+
+Cards 3 and 4 use the amber/red gradient to signal risk.
+
+**"اشرحها كأني عمري 15" button:** A special, attention-grabbing button — full width, amber→orange gradient, rounded-full, with a graduation cap icon and sparkle. When clicked, it expands a card below with simple language explanation. The button should feel like a delight to press — add a fun scale animation on click.
+
+**Risk findings section:**
+- Title: "🔍 البنود التي تحتاج انتباهك"
+- 3 finding cards, each is a glassmorphism card with colored left border accent:
+  - Danger card: red left border (3px), red icon circle, bold red title, description text
+  - Warning card: amber left border, amber icon circle
+  - Safe card: green left border, green icon
+- Each card has:
+  - Icon in colored circle (24px)
+  - Bold finding title (e.g., "تجديد تلقائي بدون إشعار")
+  - Description text (13px, muted)
+  - Small tag/chip on the corner ("خطر عالٍ" / "تحذير" / "آمن")
+
+**Simple Explanation box** (expanded when button clicked): Glassmorphism card with indigo left border. Header: robot/sparkle icon + "بلغة بسيطة". Content: easy paragraph. Background has subtle indigo gradient mesh.
+
+**Action buttons row:** 3 equal rounded buttons:
+- "وقّعت على هذا العقد" — indigo gradient — adds to archive
+- "مقارنة بعقد آخر" — glass button
+- "تصدير ملخص PDF" — glass button
+
+#### Feature 1 — Smart Contract Highlights Tab ("📄 العقد المُعلَّم")
+
+This tab shows the full contract text with inline colored highlights directly on the text:
+- 🔴 **Danger:** `background: rgba(239,68,68,0.25); border-bottom: 2px solid #EF4444` — for clauses like automatic renewal, penalty fees, repossession rights
+- 🟡 **Warning:** `background: rgba(245,158,11,0.2); border-bottom: 2px solid #F59E0B` — for high interest, long commitment
+- 🟢 **Info:** `background: rgba(16,185,129,0.15); border-bottom: 2px solid #10B981` — for consumer rights, cancellation options
+
+Each highlighted span has a superscript number badge ①②③. Clicking any highlight opens a floating glassmorphism tooltip above it (280px wide, rounded-xl, fade+scale-in animation) showing: colored icon + finding title + 2-line explanation.
+
+A legend filter bar at the top shows 🔴 3 خطيرة 🟡 2 تحذير 🟢 1 آمن as clickable pills. Auto-scroll to the first red highlight when this tab opens.
+
+### Screen 4: My Contracts Archive
+
+**Header:** "عقودي" bold + count badge (e.g. "3 عقود نشطة")
+
+**Contract cards (vertical list):** Each card is a glassmorphism card with:
+- Right: colored icon circle (contract type icon)
+- Center: contract name + company, date added
+- Left: risk pill (small) + arrow icon
+- Bottom: a thin progress bar showing "days remaining until renewal" with gradient fill
+
+**Add contract button (FAB):** Floating action button, bottom-center, large circle, indigo→purple gradient, plus icon, subtle glow. Two options appear on click (fan animation):
+- "رفع وتحليل" — with scan icon
+- "إضافة مباشرة" — with plus icon
+
+**Upcoming alerts widget at top:** A special rounded card with amber gradient background (subtle, 20% opacity), bell icon, showing: "⏰ تجديد تأمين سيارتك خلال 12 يوم"
+
+#### Feature 2 — Floating Contract Chat Agent
+
+A persistent floating circular button (bottom-left corner, indigo→purple gradient, MessageCircle Lucide icon, small pulsing amber dot indicator) visible on the results screen. Clicking it opens a bottom sheet panel (60vh height, `border-radius: 24px 24px 0 0`, spring slide-up animation).
+
+**Chat panel contents:**
+- Header: "🤖 اسأل عن عقدك" bold + subtitle "يجاوب بناءً على نص العقد فقط" muted + X close button
+- Before first message: show 4 quick-question pill chips that send on tap, then disappear:
+  - "ما هي غرامة التأخير؟"
+  - "متى ينتهي العقد؟"
+  - "هل يوجد تجديد تلقائي؟"
+  - "ما حقوقي إذا أردت الفسخ؟"
+- User bubbles: right-aligned, indigo→purple gradient, rounded (`18px 18px 4px 18px`)
+- Agent bubbles: left-aligned, glass card (`rgba(255,255,255,0.05)`), with small "مِسناد" avatar circle
+- Typing indicator: 3 bouncing dots while "loading" (mock 800ms delay)
+- Sticky bottom input: rounded-full pill, placeholder "اسأل أي سؤال عن عقدك...", send button (indigo circle, ArrowUp icon)
+
+Mock agent responses always reference a clause number and end with a clickable chip: "📄 انتقل للبند في العقد ←" — clicking it closes the chat, switches to the highlights tab, and auto-scrolls + briefly pulses that specific highlight.
+
+## Technical Requirements
+
+- React + TypeScript
+- Tailwind CSS for styling
+- Lucide React for all icons
+- Google Fonts: Cairo (Arabic)
+- `dir="rtl"` on root element
+- All text in Arabic
+- Dark theme as default
+- Framer Motion for page transitions and card animations
+- Use CSS custom properties for gradient definitions
+- Mock data for the demo (no real API needed — hardcode realistic contract analysis results)
+- The app should be fully interactive: clicking upload → goes to loading → goes to results → can navigate to archive
+- Smooth scroll within results screen
+- Mobile-first, max-width 480px centered on desktop
+
+## What makes this UNFORGETTABLE
+
+The glowing risk score ring that animates on load, the "explain like I'm 15" button with its playful amber gradient, the frosted glass cards on a deep dark background, the inline color-coded contract highlights with tooltip explanations, and the floating chat agent that lets you ask about your contract and jump straight to the relevant clause — it should feel like the most premium Arabic fintech app someone has ever seen.
