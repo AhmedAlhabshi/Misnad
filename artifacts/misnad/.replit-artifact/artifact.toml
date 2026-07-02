@@ -1,6 +1,6 @@
 kind = "web"
 previewPath = "/"
-title = "مِسناد — محلل العقود"
+title = "Misnad"
 version = "1.0.0"
 id = "artifacts/misnad"
 router = "path"
