@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import multer from "multer";
 import { parseContractPdf } from "../services/documentParser";
+import { maskPii } from "../services/piiMasker";
 
 const router: IRouter = Router();
 
@@ -23,14 +24,24 @@ router.post("/analyze-contract", upload.single("file"), async (req, res) => {
   }
 
   try {
+    // Stage 1: Extract text from PDF
     const parsed = await parseContractPdf(req.file.buffer);
 
+    // Stage 2: Mask PII before any future AI processing
+    const masked = maskPii(parsed.text);
+
+    // DEV NOTE: dual output (rawText + maskedText) is temporary — remove before production
     res.json({
       success: true,
       fileName: req.file.originalname,
-      message: "PDF text extracted successfully",
-      textPreview: parsed.textPreview,
+      message: "PDF processed and PII masked successfully",
       textLength: parsed.textLength,
+      textPreview: parsed.textPreview,
+      maskedTextPreview: masked.maskedText.slice(0, 1000),
+      piiStatistics: masked.statistics,
+      // TODO: remove rawText from response before production
+      _dev_rawText: parsed.text,
+      _dev_maskedText: masked.maskedText,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "An unexpected error occurred";

@@ -1,0 +1,125 @@
+Implement Milestone 3: PII Masking Layer.
+
+## Goal
+
+Before any future AI analysis, automatically detect and mask sensitive personal information extracted from the contract.
+
+This milestone is only responsible for masking sensitive data.
+
+Do NOT implement AI analysis.
+
+---
+
+## Requirements
+
+1. Create a dedicated PII Masking service.
+
+The masking logic must not exist inside the route.
+
+---
+
+2. The service must receive plain extracted text.
+
+Input:
+
+string
+
+Output:
+
+{
+    maskedText: "...",
+    statistics: {
+        names: 0,
+        nationalIds: 0,
+        iqamaNumbers: 0,
+        phones: 0,
+        emails: 0,
+        ibans: 0,
+        bankAccounts: 0
+    }
+}
+
+---
+
+3. Detect and mask:
+
+- Saudi National ID
+- Iqama Number
+- Phone Numbers
+- Email Addresses
+- IBAN
+- Bank Account Numbers
+
+Use deterministic rules such as Regular Expressions and validation patterns.
+
+Do NOT use AI.
+
+---
+
+4. Replace detected values with placeholders such as:
+
+[PERSON]
+[NATIONAL_ID]
+[IQAMA]
+[PHONE]
+[EMAIL]
+[IBAN]
+[BANK_ACCOUNT]
+
+---
+
+5. Keep the implementation modular.
+
+The masking service must be reusable by future AI services.
+
+---
+
+6. Update the processing pipeline to become:
+
+Upload PDF
+
+↓
+
+Extract Text
+
+↓
+
+PII Masking
+
+↓
+
+Return both the original extracted text and the masked text for development purposes only.
+
+This dual output is temporary and will be removed before production.
+
+---
+
+7. Handle errors gracefully.
+
+---
+
+8. Do NOT implement:
+
+- AI
+- OCR
+- RAG
+- Risk Engine
+- Report Generation
+
+---
+
+## Code Quality
+
+- Follow the current architecture.
+- Keep the service independent.
+- Write production-quality TypeScript.
+- Keep the implementation extensible.
+
+---
+
+## Validation
+
+Test with a contract containing personal information and verify that all supported PII fields are masked correctly.
+
+Do not commit or push yet.
+Wait for manual verification before creating a stable checkpoint.
