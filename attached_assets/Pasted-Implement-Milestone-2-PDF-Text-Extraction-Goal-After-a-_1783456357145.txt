@@ -1,0 +1,160 @@
+Implement Milestone 2: PDF Text Extraction.
+
+## Goal
+
+After a PDF upload succeeds, extract readable text from the uploaded PDF.
+
+This milestone should only focus on document parsing.
+
+Do NOT implement AI, OCR, masking, RAG, or any financial analysis yet.
+
+---
+
+## Requirements
+
+### 1. Keep the existing upload pipeline
+
+- Do not modify the existing upload behavior.
+- Keep the current endpoint.
+- Keep the current multer memory storage configuration.
+- Continue accepting PDF files only.
+
+---
+
+### 2. Create a dedicated Document Parser service
+
+Create a new service responsible only for PDF text extraction.
+
+The parsing logic must NOT live inside the route.
+
+Follow separation of concerns.
+
+Responsibility:
+
+PDF Buffer
+↓
+Document Parser Service
+↓
+Extracted Text
+
+---
+
+### 3. Use a reliable PDF parsing library
+
+Use a reliable and actively maintained PDF parsing library.
+
+pdf-parse is acceptable.
+
+---
+
+### 4. Read directly from memory
+
+Read the uploaded PDF directly from the multer memory buffer.
+
+Do NOT save temporary files to disk.
+
+---
+
+### 5. Return the following JSON
+
+{
+  "success": true,
+  "fileName": "...",
+  "message": "PDF text extracted successfully",
+  "textPreview": "...",
+  "textLength": 12345
+}
+
+Requirements:
+
+- textPreview must contain only the first 1000 characters.
+- textLength must represent the total extracted character count.
+
+---
+
+### 6. Error handling
+
+Handle parsing failures gracefully.
+
+Return appropriate HTTP status codes and meaningful error messages.
+
+Do not expose internal implementation details.
+
+---
+
+### 7. Keep the route clean
+
+The route should only:
+
+- Validate the request
+- Call the Document Parser service
+- Return the response
+
+All business logic must remain inside the service.
+
+---
+
+### 8. Architecture constraints
+
+Do NOT implement:
+
+- OCR
+- AI analysis
+- LLM integration
+- RAG
+- PII masking
+- Risk Engine
+- Smart Financial Report
+- Database persistence
+
+Those belong to future milestones.
+
+---
+
+## Expected Flow
+
+Upload PDF
+↓
+Document Parser Service
+↓
+Extract Text
+↓
+Return JSON
+↓
+Frontend receives the extracted text
+
+---
+
+## Code Quality
+
+- Follow the existing project architecture.
+- Create reusable and maintainable code.
+- Use production-quality TypeScript.
+- Avoid duplicated logic.
+- Keep the implementation extensible for future milestones.
+- Keep responsibilities clearly separated.
+
+---
+
+## Validation
+
+After implementation:
+
+1. Test using a real PDF.
+2. Verify that the extracted text is readable.
+3. Verify that textPreview is limited to 1000 characters.
+4. Ensure the existing upload functionality still works correctly.
+
+---
+
+## Git
+
+When Milestone 2 is complete:
+
+1. Run all necessary tests.
+2. Commit the changes.
+3. Push to GitHub.
+
+Commit message:
+
+feat: implement PDF text extraction pipeline (Milestone 2)
