@@ -34,7 +34,7 @@ _Describe the high-level user-facing capabilities of this app once they exist._
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Skip upfront planning discussion — when the user gives a prompt/spec, execute it directly, then the user will test and give feedback.
 
 ## Gotchas
 
