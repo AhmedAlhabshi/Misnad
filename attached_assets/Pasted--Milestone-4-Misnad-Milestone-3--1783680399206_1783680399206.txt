@@ -1,0 +1,122 @@
+نريد تنفيذ الجزء الأول فقط من Milestone 4 في مشروع Misnad.
+
+الحالة الحالية:
+
+* Milestone 3 يعمل بشكل صحيح.
+* رفع PDF واستخراج النص وإخفاء البيانات الحساسة كلها تعمل.
+* لا نريد تغيير أي سلوك حالي.
+
+المطلوب الآن:
+تنفيذ Milestone 4.1 فقط: إنشاء تعريف مركزي ومشترك لأنواع العقود.
+
+مهم جدًا:
+
+* لا تعدّل API route الحالي.
+* لا تعدّل analyze-contract.
+* لا تضف OpenAI.
+* لا تضف Zod schema للتحليل.
+* لا تعدّل frontend.
+* لا تغيّر سلوك رفع PDF.
+* لا تضف userSelectedContractType إلى الطلب.
+* لا تكمل أي جزء آخر من Milestone 4.
+* لا تشغّل اختبار رفع PDF؛ المستخدم سيختبر بنفسه.
+* لا تعمل commit أو push.
+
+أنشئ مجلدًا مشتركًا مناسبًا داخل المشروع، مثل:
+
+lib/contract-types/
+
+وأنشئ داخله ملفًا أو أكثر يحتوي على أنواع العقود التالية:
+
+1. auto_finance
+   العربية: تمويل سيارات
+   English: Auto Finance
+
+2. personal_finance
+   العربية: تمويل شخصي
+   English: Personal Finance
+
+3. mortgage
+   العربية: تمويل عقاري
+   English: Mortgage
+
+4. credit_card
+   العربية: بطاقة ائتمانية
+   English: Credit Card
+
+5. lease
+   العربية: إيجار
+   English: Lease
+
+6. insurance
+   العربية: تأمين
+   English: Insurance
+
+7. employment
+   العربية: عقد عمل
+   English: Employment Contract
+
+8. subscription
+   العربية: اشتراك
+   English: Subscription
+
+9. other
+   العربية: أخرى
+   English: Other
+
+المطلوب أن يكون لدينا مصدر واحد للحقيقة Single Source of Truth يمكن استخدامه لاحقًا من الـ frontend والـ backend بدون تكرار القيم.
+
+أنشئ:
+
+* TypeScript union type باسم ContractType.
+* ثابت يحتوي جميع أنواع العقود.
+* labels بالعربية والإنجليزية.
+* helper function بسيطة للتحقق هل القيمة ContractType صحيحة أم لا.
+* exports واضحة يمكن استيرادها لاحقًا.
+
+مثال للشكل المتوقع:
+
+export type ContractType =
+| "auto_finance"
+| "personal_finance"
+| "mortgage"
+| "credit_card"
+| "lease"
+| "insurance"
+| "employment"
+| "subscription"
+| "other";
+
+ويكون لدينا أيضًا بيانات مثل:
+
+{
+value: "auto_finance",
+labelAr: "تمويل سيارات",
+labelEn: "Auto Finance"
+}
+
+أضف verification script بسيطًا يتأكد من:
+
+* وجود 9 أنواع فقط.
+* عدم تكرار أي value.
+* كل نوع لديه labelAr.
+* كل نوع لديه labelEn.
+* isContractType("auto_finance") ترجع true.
+* isContractType("invalid_type") ترجع false.
+
+بعد التنفيذ:
+
+1. شغّل TypeScript check فقط.
+2. شغّل verification script الخاص بهذه الخطوة فقط.
+3. لا تشغّل اختبار رفع PDF.
+4. لا تعدّل أي ملف خارج النطاق إلا إذا كان ضروريًا لتسجيل script بسيط.
+5. لا تعمل commit أو push.
+
+أرسل لي في النهاية فقط:
+
+* الملفات التي تم إنشاؤها أو تعديلها.
+* الكود الكامل لكل ملف جديد أو معدل.
+* نتيجة TypeScript check.
+* نتيجة verification script.
+* تأكيد أن analyze-contract لم يتم تعديله.
+* تأكيد أن frontend لم يتم تعديله.

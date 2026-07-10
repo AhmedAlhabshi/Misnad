@@ -5,7 +5,11 @@
   "type": "module",
   "scripts": {
     "hello": "tsx ./src/hello.ts",
+    "verify-contract-types": "tsx ./src/verify-contract-types.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@workspace/contract-types": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

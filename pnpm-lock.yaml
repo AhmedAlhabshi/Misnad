@@ -621,6 +621,8 @@ importers:
         specifier: 'catalog:'
         version: 3.25.76
 
+  lib/contract-types: {}
+
   lib/db:
     dependencies:
       drizzle-orm:
@@ -647,6 +649,10 @@ importers:
         version: 0.31.10
 
   scripts:
+    dependencies:
+      '@workspace/contract-types':
+        specifier: workspace:*
+        version: link:../lib/contract-types
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
