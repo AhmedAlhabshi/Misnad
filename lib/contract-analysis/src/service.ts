@@ -1,5 +1,8 @@
 import { isContractType, type ContractType } from "@workspace/contract-types";
-import type { ContractUnderstanding } from "@workspace/contract-schema";
+import {
+  getContractUnderstandingJsonSchemaFor,
+  type ContractUnderstanding,
+} from "@workspace/contract-schema";
 import {
   emptyMaskedTextError,
   invalidContractTypeError,
@@ -31,12 +34,16 @@ export async function analyzeContract(
 
   const provider = options.provider ?? geminiContractAnalysisProvider;
 
+  const jsonSchema = getContractUnderstandingJsonSchemaFor(contractType);
+
   const firstResponse = await provider.generate({
     systemInstructions: SYSTEM_INSTRUCTIONS,
     userPrompt: buildAnalysisPrompt(maskedText, contractType),
+    jsonSchema,
   });
 
   const firstAttempt = tryValidate(firstResponse.rawText);
+
   if (firstAttempt.success && firstAttempt.data) {
     return firstAttempt.data;
   }
@@ -49,9 +56,11 @@ export async function analyzeContract(
       validationErrorSummary:
         firstAttempt.errorSummary ?? "The response was not valid JSON.",
     }),
+    jsonSchema,
   });
 
   const secondAttempt = tryValidate(correctionResponse.rawText);
+
   if (secondAttempt.success && secondAttempt.data) {
     return secondAttempt.data;
   }

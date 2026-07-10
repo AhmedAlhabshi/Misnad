@@ -1,0 +1,1 @@
+- [Gemini structured output + Zod](gemini-structured-output-zod.md) — use responseJsonSchema (not responseSchema) with a Zod-derived JSON Schema; zod/v4's toJSONSchema needs a const→enum patch for Gemini compatibility.

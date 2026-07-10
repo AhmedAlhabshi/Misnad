@@ -1,5 +1,5 @@
-import { z } from "zod";
-import { CONTRACT_TYPE_VALUES } from "@workspace/contract-types";
+import { z } from "zod/v4";
+import { CONTRACT_TYPE_VALUES, type ContractType } from "@workspace/contract-types";
 
 export const contractTypeSchema = z.enum(
   CONTRACT_TYPE_VALUES as [string, ...string[]],
@@ -161,19 +161,107 @@ export const contractTypeDetailsSchema = z.discriminatedUnion("contractType", [
   otherDetailsSchema,
 ]);
 
-export const contractUnderstandingSchema = z.object({
-  contractType: contractTypeSchema,
-  parties: z.array(partySchema),
-  financialObligations: z.array(financialObligationSchema),
-  dates: z.array(contractDateSchema),
-  penalties: z.array(penaltySchema),
-  fees: z.array(feeSchema),
-  importantClauses: z.array(importantClauseSchema),
-  extractedNumbers: z.array(extractedNumberSchema),
-  missingInformation: z.array(missingInformationItemSchema),
-  extractionNotes: z.string().nullable(),
-  typeDetails: contractTypeDetailsSchema,
-});
+const CONTRACT_TYPE_DETAILS_SCHEMA_BY_TYPE = {
+  auto_finance: autoFinanceDetailsSchema,
+  personal_finance: personalFinanceDetailsSchema,
+  mortgage: mortgageDetailsSchema,
+  credit_card: creditCardDetailsSchema,
+  lease: leaseDetailsSchema,
+  insurance: insuranceDetailsSchema,
+  employment: employmentDetailsSchema,
+  subscription: subscriptionDetailsSchema,
+  other: otherDetailsSchema,
+} as const satisfies Record<ContractType, z.ZodTypeAny>;
+
+/**
+ * Returns the type-specific details schema for a single contract type
+ * (e.g. only `otherDetailsSchema` for "other"), instead of the full
+ * 9-branch discriminated union. Used to keep the schema handed to the
+ * model as small/specific as possible when the contract type is already
+ * known.
+ */
+export function getContractTypeDetailsSchemaFor<T extends ContractType>(
+  contractType: T,
+): (typeof CONTRACT_TYPE_DETAILS_SCHEMA_BY_TYPE)[T] {
+  return CONTRACT_TYPE_DETAILS_SCHEMA_BY_TYPE[contractType];
+}
+
+function buildContractUnderstandingSchema<
+  TypeDetails extends z.ZodTypeAny,
+  ContractTypeField extends z.ZodTypeAny = typeof contractTypeSchema,
+>(typeDetailsSchema: TypeDetails, contractTypeField?: ContractTypeField) {
+  return z.object({
+    contractType: contractTypeField ?? contractTypeSchema,
+    parties: z.array(partySchema),
+    financialObligations: z.array(financialObligationSchema),
+    dates: z.array(contractDateSchema),
+    penalties: z.array(penaltySchema),
+    fees: z.array(feeSchema),
+    importantClauses: z.array(importantClauseSchema),
+    extractedNumbers: z.array(extractedNumberSchema),
+    missingInformation: z.array(missingInformationItemSchema),
+    extractionNotes: z.string().nullable(),
+    typeDetails: typeDetailsSchema,
+  });
+}
+
+export const contractUnderstandingSchema = buildContractUnderstandingSchema(
+  contractTypeDetailsSchema,
+);
+
+/**
+ * Returns the full contract-understanding schema, but with `typeDetails`
+ * narrowed to only the branch matching the given contract type, instead of
+ * the full 9-branch union. This is the schema that should be handed to the
+ * model when the contract type is already known (e.g. via structured
+ * output config), so the model isn't asked to consider irrelevant branches.
+ *
+ * This does NOT replace `contractUnderstandingSchema` as the source of
+ * truth for final response validation — callers should still run the
+ * model's response through `contractUnderstandingSchema.safeParse(...)`.
+ */
+export function getContractUnderstandingSchemaFor<T extends ContractType>(
+  contractType: T,
+) {
+  return buildContractUnderstandingSchema(
+    getContractTypeDetailsSchemaFor(contractType),
+    z.literal(contractType),
+  );
+}
+
+/**
+ * Converts a Zod schema to a JSON Schema using Zod's own official
+ * conversion (`z.toJSONSchema`), then applies the minimal, generic
+ * adjustments needed for compatibility with Gemini's `responseJsonSchema`
+ * supported subset (documented by @google/genai): notably, Gemini supports
+ * `enum` but not `const`, so single-value `const` schemas (as produced for
+ * `z.literal(...)`) are rewritten as an equivalent single-value `enum`.
+ * This is a structural/representational adjustment only — it does not add,
+ * remove, or loosen any field or constraint from the schema Zod generated.
+ */
+export function toGeminiJsonSchema(schema: z.ZodTypeAny): unknown {
+  return z.toJSONSchema(schema, {
+    target: "draft-7",
+    override: (ctx) => {
+      const jsonSchema = ctx.jsonSchema as Record<string, unknown>;
+      if ("const" in jsonSchema) {
+        jsonSchema.enum = [jsonSchema.const];
+        delete jsonSchema.const;
+      }
+    },
+  });
+}
+
+/**
+ * Convenience helper: builds the type-narrowed contract-understanding
+ * schema for the given contract type (see `getContractUnderstandingSchemaFor`)
+ * and converts it to a Gemini-compatible JSON Schema in one step.
+ */
+export function getContractUnderstandingJsonSchemaFor(
+  contractType: ContractType,
+): unknown {
+  return toGeminiJsonSchema(getContractUnderstandingSchemaFor(contractType));
+}
 
 export type Party = z.infer<typeof partySchema>;
 export type FinancialObligation = z.infer<typeof financialObligationSchema>;

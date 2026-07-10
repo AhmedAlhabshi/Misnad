@@ -6,6 +6,9 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "scripts": {
+    "test": "tsx src/__tests__/geminiProvider.jsonSchema.test.ts && tsx src/__tests__/contractSchema.otherType.test.ts && tsx src/__tests__/validate.rejectsFabricatedFields.test.ts && tsx src/__tests__/service.maskedTextIntegrity.test.ts"
+  },
   "dependencies": {
     "@google/genai": "^1.30.0",
     "@workspace/contract-schema": "workspace:*",
@@ -13,6 +16,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "catalog:"
+    "@types/node": "catalog:",
+    "tsx": "catalog:"
   }
 }

@@ -61,7 +61,7 @@ catalogs:
       specifier: ^4.1.14
       version: 4.3.1
     tsx:
-      specifier: ^4.21.0
+      specifier: 4.22.4
       version: 4.22.4
     vite:
       specifier: ^7.3.2
@@ -169,6 +169,12 @@ importers:
       '@workspace/api-zod':
         specifier: workspace:*
         version: link:../../lib/api-zod
+      '@workspace/contract-analysis':
+        specifier: workspace:*
+        version: link:../../lib/contract-analysis
+      '@workspace/contract-schema':
+        specifier: workspace:*
+        version: link:../../lib/contract-schema
       '@workspace/db':
         specifier: workspace:*
         version: link:../../lib/db
@@ -639,6 +645,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 25.9.4
+      tsx:
+        specifier: 'catalog:'
+        version: 4.22.4
 
   lib/contract-schema:
     dependencies:

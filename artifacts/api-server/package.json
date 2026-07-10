@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",
+    "@workspace/contract-analysis": "workspace:*",
+    "@workspace/contract-schema": "workspace:*",
     "@workspace/db": "workspace:*",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
