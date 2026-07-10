@@ -621,6 +621,15 @@ importers:
         specifier: 'catalog:'
         version: 3.25.76
 
+  lib/contract-schema:
+    dependencies:
+      '@workspace/contract-types':
+        specifier: workspace:*
+        version: link:../contract-types
+      zod:
+        specifier: 'catalog:'
+        version: 3.25.76
+
   lib/contract-types: {}
 
   lib/db:

@@ -7,6 +7,9 @@
       "path": "./lib/contract-types"
     },
     {
+      "path": "./lib/contract-schema"
+    },
+    {
       "path": "./lib/db"
     },
     {
