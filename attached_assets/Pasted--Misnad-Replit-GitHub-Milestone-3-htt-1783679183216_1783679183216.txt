@@ -1,0 +1,95 @@
+أريدك أن تعيد مشروع Misnad داخل Replit ليطابق GitHub تمامًا عند نهاية Milestone 3.
+
+المستودع:
+https://github.com/AhmedAlhabshi/Misnad.git
+
+الفرع:
+main
+
+الـ commit المطلوب:
+1d8990b
+
+اسم الـ commit:
+Add PII masking to process uploaded contract documents
+
+المطلوب منك تنفيذ التالي بدقة:
+
+1. أوقف أي سيرفرات أو عمليات قديمة تعمل للمشروع.
+2. احذف أي ملفات build أو cache قديمة قد تحتوي على كود من Milestone 4، مثل:
+
+   * .next
+   * dist
+   * artifacts/api-server/dist
+   * node_modules/.cache
+   * .turbo
+3. نفّذ fetch من GitHub.
+4. أعد جميع ملفات المشروع المحلية لتطابق commit:
+   1d8990b
+5. احذف أي ملفات غير متتبعة أو ملفات متبقية من Milestone 4.
+6. لا تحفظ أي نسخة احتياطية من التعديلات الحالية.
+7. لا تنشئ branch جديدًا.
+8. لا تضف أو تعدّل أي كود.
+9. لا تحاول إصلاح المشروع يدويًا.
+10. يجب أن تكون جميع الملفات مطابقة تمامًا لما هو موجود في GitHub عند commit 1d8990b.
+11. بعد الرجوع، أعد تثبيت dependencies باستخدام package manager الموجود في المشروع.
+12. شغّل المشروع من جديد.
+
+استخدم أوامر Git المناسبة، بما فيها ما يعادل:
+
+git fetch origin
+git reset --hard 1d8990b
+git clean -fd
+
+وتأكد أيضًا من إزالة build/cache القديمة قبل إعادة التشغيل.
+
+بعد الانتهاء، نفّذ هذه الفحوصات:
+
+git rev-parse --short HEAD
+git status
+git log --oneline -3
+
+النتيجة المطلوبة:
+
+HEAD يجب أن يكون:
+1d8990b
+
+ويجب أن يظهر:
+nothing to commit, working tree clean
+
+ثم ابحث داخل المشروع عن أي أثر لـ Milestone 4 باستخدام:
+
+userSelectedContractType
+contractUnderstanding
+A valid contract type
+
+لا يجب أن تظهر أي نتائج في ملفات المصدر.
+
+استثنِ من البحث:
+
+* node_modules
+* .git
+* .next
+* dist
+
+بعد ذلك شغّل المشروع واختبر رفع ملف PDF.
+
+المفروض أن يعمل تدفق Milestone 3 فقط:
+
+Upload PDF
+Extract text
+Mask PII
+Return maskedTextPreview and piiStatistics
+
+ولا يجب أن يطلب:
+userSelectedContractType
+
+ولا يجب أن يظهر الخطأ:
+A valid contract type (userSelectedContractType) must be provided
+
+مهم جدًا:
+لا تنفذ Milestone 4.
+لا تضف contract type.
+لا تغيّر API.
+لا تعدّل frontend.
+لا تعدّل backend.
+فقط اجعل نسخة Replit مطابقة تمامًا لـ GitHub عند commit 1d8990b، ثم أعد تشغيلها واختبرها.
