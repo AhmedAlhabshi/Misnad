@@ -10,6 +10,9 @@
       "path": "./lib/contract-schema"
     },
     {
+      "path": "./lib/contract-analysis"
+    },
+    {
       "path": "./lib/db"
     },
     {

@@ -1,0 +1,62 @@
+import type { ContractType } from "@workspace/contract-types";
+import { CONTRACT_TYPE_LABELS_EN } from "@workspace/contract-types";
+
+export const SYSTEM_INSTRUCTIONS = `You are a contract understanding engine.
+
+Rules you must follow strictly:
+- Analyze the contract based ONLY on the text provided to you. Never rely on outside knowledge of the parties or document.
+- Never invent information that is not present in the text.
+- Never infer amounts or dates without clear evidence in the text.
+- Use null or the schema's allowed empty values whenever information is missing.
+- Add every piece of missing information to "missingInformation".
+- Add any text or extraction problems you notice to "extractionNotes".
+- Keep any quotes or evidence short.
+- The "contractType" field in your output must exactly match the contract type you are told to use.
+- The "typeDetails.contractType" field must also exactly match that same contract type.
+- Only extract the type-specific details that are relevant to the given contract type; leave other type-specific fields null.
+- Return ONLY JSON. Do not return Markdown formatting, code fences, or any explanation outside the JSON object.
+- Do not provide legal advice.
+- Do not claim that this analysis is a substitute for review by a qualified professional.`;
+
+export function buildAnalysisPrompt(
+  maskedText: string,
+  contractType: ContractType,
+): string {
+  const label = CONTRACT_TYPE_LABELS_EN[contractType];
+
+  return `The contract type you must use for this analysis is: "${contractType}" (${label}).
+
+Analyze the following masked contract text and extract a structured contract understanding result that matches the required JSON schema exactly.
+
+Masked contract text:
+"""
+${maskedText}
+"""`;
+}
+
+export interface CorrectionPromptInput {
+  contractType: ContractType;
+  previousResponseText: string;
+  validationErrorSummary: string;
+}
+
+const MAX_PREVIOUS_RESPONSE_CHARS = 4000;
+
+export function buildCorrectionPrompt(input: CorrectionPromptInput): string {
+  const truncatedPrevious =
+    input.previousResponseText.length > MAX_PREVIOUS_RESPONSE_CHARS
+      ? `${input.previousResponseText.slice(0, MAX_PREVIOUS_RESPONSE_CHARS)}...(truncated)`
+      : input.previousResponseText;
+
+  return `Your previous response for contract type "${input.contractType}" was not valid.
+
+Previous response:
+"""
+${truncatedPrevious}
+"""
+
+Validation problems that must be fixed:
+${input.validationErrorSummary}
+
+Return the corrected, complete result again as a single valid JSON object matching the required schema exactly. Do not return Markdown or any explanation outside the JSON object.`;
+}

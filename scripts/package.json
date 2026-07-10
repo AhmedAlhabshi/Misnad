@@ -6,9 +6,11 @@
   "scripts": {
     "hello": "tsx ./src/hello.ts",
     "verify-contract-types": "tsx ./src/verify-contract-types.ts",
+    "verify-contract-analysis": "tsx ./src/verify-contract-analysis.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@workspace/contract-analysis": "workspace:*",
     "@workspace/contract-types": "workspace:*"
   },
   "devDependencies": {
