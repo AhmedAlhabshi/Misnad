@@ -1,18 +1,19 @@
-import { useState, useRef } from "react";
+import { useState, useRef, type ReactElement } from "react";
 import { motion } from "framer-motion";
 import { Upload, Shield, Archive, Sparkles, Car, CreditCard, Home, Smartphone, ShieldCheck, FileText, Loader2 } from "lucide-react";
+import type { ContractType } from "@workspace/contract-types";
 
-const CONTRACT_TYPES = [
-  { id: "car", label: "تمويل سيارة", icon: <Car size={16} /> },
-  { id: "credit", label: "بطاقة ائتمانية", icon: <CreditCard size={16} /> },
-  { id: "home", label: "تمويل عقاري", icon: <Home size={16} /> },
-  { id: "sub", label: "اشتراك", icon: <Smartphone size={16} /> },
+const CONTRACT_TYPES: { id: ContractType; label: string; icon: ReactElement }[] = [
+  { id: "auto_finance", label: "تمويل سيارة", icon: <Car size={16} /> },
+  { id: "credit_card", label: "بطاقة ائتمانية", icon: <CreditCard size={16} /> },
+  { id: "mortgage", label: "تمويل عقاري", icon: <Home size={16} /> },
+  { id: "subscription", label: "اشتراك", icon: <Smartphone size={16} /> },
   { id: "insurance", label: "تأمين", icon: <ShieldCheck size={16} /> },
-  { id: "job", label: "عقد عمل", icon: <FileText size={16} /> },
+  { id: "employment", label: "عقد عمل", icon: <FileText size={16} /> },
 ];
 
 export default function HomeScreen({ onNavigate }: { onNavigate: (s: string) => void }) {
-  const [selectedType, setSelectedType] = useState("car");
+  const [selectedType, setSelectedType] = useState<ContractType>("auto_finance");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +43,7 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (s: string) => 
     try {
       const formData = new FormData();
       formData.append("file", selectedFile);
+      formData.append("userSelectedContractType", selectedType);
 
       const res = await fetch("/api/analyze-contract", {
         method: "POST",

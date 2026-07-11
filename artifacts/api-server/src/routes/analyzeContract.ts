@@ -4,8 +4,7 @@ import { parseContractPdf } from "../services/documentParser";
 import { maskPii } from "../services/piiMasker";
 import { analyzeContract, ContractAnalysisError } from "@workspace/contract-analysis";
 import type { ContractUnderstanding } from "@workspace/contract-schema";
-
-const TEMPORARY_CONTRACT_TYPE = "other" as const;
+import { isContractType } from "@workspace/contract-types";
 
 const router: IRouter = Router();
 
@@ -27,6 +26,15 @@ router.post("/analyze-contract", upload.single("file"), async (req, res) => {
     return;
   }
 
+  const userSelectedContractType = req.body.userSelectedContractType;
+  if (!isContractType(userSelectedContractType)) {
+    res.status(400).json({
+      success: false,
+      message: "userSelectedContractType is missing or invalid",
+    });
+    return;
+  }
+
   try {
     // Stage 1: Extract text from PDF
     const parsed = await parseContractPdf(req.file.buffer);
@@ -40,7 +48,7 @@ router.post("/analyze-contract", upload.single("file"), async (req, res) => {
     let analysisError: string | null = null;
 
     try {
-      analysis = await analyzeContract(masked.maskedText, TEMPORARY_CONTRACT_TYPE);
+      analysis = await analyzeContract(masked.maskedText, userSelectedContractType);
     } catch (err) {
       analysisError =
         err instanceof ContractAnalysisError
