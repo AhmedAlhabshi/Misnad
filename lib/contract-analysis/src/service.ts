@@ -51,6 +51,7 @@ export async function analyzeContract(
   const correctionResponse = await provider.generate({
     systemInstructions: SYSTEM_INSTRUCTIONS,
     userPrompt: buildCorrectionPrompt({
+      maskedText,
       contractType,
       previousResponseText: firstResponse.rawText,
       validationErrorSummary:

@@ -14,6 +14,7 @@ Rules you must follow strictly:
 - Keep any quotes or evidence short.
 - The "contractType" field in your output must exactly match the contract type you are told to use.
 - The "typeDetails.contractType" field must also exactly match that same contract type.
+- The "detectedContractType" field is different: it is your own independent classification of what the contract actually appears to be, based only on the masked contract text. Do NOT simply copy the contract type you were told to use into this field — inspect the content and decide for yourself. Choose exactly one of: "auto_finance", "credit_card", "mortgage", "personal_finance", "lease", "insurance", "employment", "subscription", or "other". If the text does not clearly indicate one of these types, use "other".
 - Only extract the type-specific details that are relevant to the given contract type; leave other type-specific fields null.
 - Your JSON response MUST conform exactly to the provided response schema: use only the fields defined in that schema, with the exact field names given. Do not add, rename, or restructure fields.
 - Return ONLY JSON. Do not return Markdown formatting, code fences, or any explanation outside the JSON object.
@@ -28,6 +29,8 @@ export function buildAnalysisPrompt(
 
   return `The contract type you must use for this analysis is: "${contractType}" (${label}).
 
+Separately, independently classify the contract's apparent type from its actual content and report it in "detectedContractType" — this may or may not match "${contractType}"; do not assume they match.
+
 Analyze the following masked contract text and extract a structured contract understanding result that matches the required JSON schema exactly.
 
 Masked contract text:
@@ -37,6 +40,7 @@ ${maskedText}
 }
 
 export interface CorrectionPromptInput {
+  maskedText: string;
   contractType: ContractType;
   previousResponseText: string;
   validationErrorSummary: string;
@@ -59,6 +63,13 @@ ${truncatedPrevious}
 
 Validation problems that must be fixed:
 ${input.validationErrorSummary}
+
+The masked contract text is still the ONLY source of truth for this correction — it has not changed since your previous response. Do not claim it is missing.
+
+Masked contract text:
+"""
+${input.maskedText}
+"""
 
 Return the corrected, complete result again as a single valid JSON object matching the required schema exactly. Do not return Markdown or any explanation outside the JSON object.`;
 }

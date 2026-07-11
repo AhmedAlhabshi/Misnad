@@ -32,6 +32,7 @@ export function run(): void {
 
   const valid = {
     contractType: "other",
+    detectedContractType: "other",
     parties: [],
     financialObligations: [],
     dates: [],

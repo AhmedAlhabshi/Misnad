@@ -192,6 +192,12 @@ function buildContractUnderstandingSchema<
 >(typeDetailsSchema: TypeDetails, contractTypeField?: ContractTypeField) {
   return z.object({
     contractType: contractTypeField ?? contractTypeSchema,
+    /**
+     * The model's own independent classification of the apparent contract
+     * type based on the contract content — always the full canonical enum,
+     * never narrowed to the user-selected/asserted `contractType` above.
+     */
+    detectedContractType: contractTypeSchema,
     parties: z.array(partySchema),
     financialObligations: z.array(financialObligationSchema),
     dates: z.array(contractDateSchema),

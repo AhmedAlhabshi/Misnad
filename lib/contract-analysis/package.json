@@ -7,7 +7,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "tsx src/__tests__/geminiProvider.jsonSchema.test.ts && tsx src/__tests__/contractSchema.otherType.test.ts && tsx src/__tests__/validate.rejectsFabricatedFields.test.ts && tsx src/__tests__/service.maskedTextIntegrity.test.ts"
+    "test": "tsx src/__tests__/geminiProvider.jsonSchema.test.ts && tsx src/__tests__/contractSchema.otherType.test.ts && tsx src/__tests__/validate.rejectsFabricatedFields.test.ts && tsx src/__tests__/service.maskedTextIntegrity.test.ts && tsx src/__tests__/service.detectedContractType.test.ts && tsx src/__tests__/service.correctionPromptIncludesMaskedText.test.ts"
   },
   "dependencies": {
     "@google/genai": "^1.30.0",
