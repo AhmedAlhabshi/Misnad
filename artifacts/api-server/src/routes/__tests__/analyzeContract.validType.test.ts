@@ -4,6 +4,7 @@ import { handleAnalyzeContract, type AnalyzeContractHandlerDeps } from "../analy
 import type { ParsedDocument } from "../../services/documentParser";
 import type { MaskedDocument, PiiStatistics } from "../../services/piiMasker";
 import type { ContractUnderstanding } from "@workspace/contract-schema";
+import type { FinancialMetrics } from "@workspace/financial-metrics";
 
 function createMockReq(body: Record<string, unknown>): Request {
   return {
@@ -66,11 +67,15 @@ const FAKE_ANALYSIS_RESULT: ContractUnderstanding = {
   },
 };
 
+const FAKE_FINANCIAL_METRICS = { schemaVersion: "1.0", fake: true } as unknown as FinancialMetrics;
+
 export async function run(): Promise<void> {
   let parseCallCount = 0;
   let maskCallCount = 0;
   let analyzeCallCount = 0;
+  let financialMetricsCallCount = 0;
   let capturedArgs: unknown[] = [];
+  let capturedFinancialMetricsArgs: unknown[] = [];
 
   const deps: AnalyzeContractHandlerDeps = {
     async parseContractPdf(): Promise<ParsedDocument> {
@@ -85,6 +90,11 @@ export async function run(): Promise<void> {
       analyzeCallCount += 1;
       capturedArgs = args;
       return FAKE_ANALYSIS_RESULT;
+    },
+    calculateFinancialMetrics(...args: unknown[]): FinancialMetrics {
+      financialMetricsCallCount += 1;
+      capturedFinancialMetricsArgs = args;
+      return FAKE_FINANCIAL_METRICS;
     },
   } as AnalyzeContractHandlerDeps;
 
@@ -122,9 +132,32 @@ export async function run(): Promise<void> {
     "analyzeContract must receive the selected analysis language unchanged",
   );
 
-  const body = res.body as { success: boolean; analysis: { contractType: string } };
+  // Milestone 5.7: the financial engine must be called exactly once, after a
+  // successful analysis, with exactly the validated analysis object — no
+  // masked text, no raw text, no second (reference-date) argument.
+  assert.equal(financialMetricsCallCount, 1, "calculateFinancialMetrics must be called exactly once");
+  assert.equal(capturedFinancialMetricsArgs.length, 1, "calculateFinancialMetrics must be called with no options/reference-date argument");
+  assert.equal(
+    capturedFinancialMetricsArgs[0],
+    FAKE_ANALYSIS_RESULT,
+    "calculateFinancialMetrics must receive exactly the validated analysis object returned by analyzeContract",
+  );
+
+  const body = res.body as {
+    success: boolean;
+    analysis: { contractType: string };
+    financialMetrics: unknown;
+    financialMetricsError: unknown;
+    fileName: string;
+    piiStatistics: unknown;
+  };
   assert.equal(body.success, true);
   assert.equal(body.analysis.contractType, "auto_finance");
+  assert.equal(body.financialMetrics, FAKE_FINANCIAL_METRICS, "the response must preserve the exact financialMetrics returned by the engine");
+  assert.equal(body.financialMetricsError, null);
+  // Existing response fields remain present and unchanged.
+  assert.equal(body.fileName, "test.pdf");
+  assert.deepEqual(body.piiStatistics, EMPTY_PII_STATISTICS);
 
   console.log("PASS analyzeContract.validType.test.ts");
 }

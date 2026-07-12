@@ -190,6 +190,9 @@ importers:
       '@workspace/db':
         specifier: workspace:*
         version: link:../../lib/db
+      '@workspace/financial-metrics':
+        specifier: workspace:*
+        version: link:../../lib/financial-metrics
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
