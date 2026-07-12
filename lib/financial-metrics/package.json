@@ -1,0 +1,19 @@
+{
+  "name": "@workspace/financial-metrics",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "tsx src/__tests__/moneyMetric.test.ts && tsx src/__tests__/percentageMetric.test.ts && tsx src/__tests__/rangeMetric.test.ts && tsx src/__tests__/financialMetrics.validCases.test.ts && tsx src/__tests__/financialMetrics.invalidCases.test.ts"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "catalog:"
+  }
+}

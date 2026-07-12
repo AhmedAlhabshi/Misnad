@@ -706,6 +706,19 @@ importers:
         specifier: ^0.31.10
         version: 0.31.10
 
+  lib/financial-metrics:
+    dependencies:
+      zod:
+        specifier: 'catalog:'
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.4
+      tsx:
+        specifier: 'catalog:'
+        version: 4.22.4
+
   scripts:
     dependencies:
       '@workspace/contract-analysis':

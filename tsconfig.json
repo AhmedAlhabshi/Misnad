@@ -13,6 +13,9 @@
       "path": "./lib/contract-analysis"
     },
     {
+      "path": "./lib/financial-metrics"
+    },
+    {
       "path": "./lib/db"
     },
     {
