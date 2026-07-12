@@ -708,6 +708,12 @@ importers:
 
   lib/financial-metrics:
     dependencies:
+      '@workspace/contract-schema':
+        specifier: workspace:*
+        version: link:../contract-schema
+      '@workspace/contract-types':
+        specifier: workspace:*
+        version: link:../contract-types
       zod:
         specifier: 'catalog:'
         version: 3.25.76

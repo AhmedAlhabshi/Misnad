@@ -14,3 +14,5 @@ export * from "./exposure";
 export * from "./positiveFinancialFactor";
 export * from "./calculationMetadata";
 export * from "./financialMetrics";
+export * from "./errors";
+export { calculateFinancialMetrics, type FinancialMetricsEngineOptions } from "./engine";
