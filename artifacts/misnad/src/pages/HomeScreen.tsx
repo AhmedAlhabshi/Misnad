@@ -1,23 +1,57 @@
 import { useState, useRef, type ReactElement } from "react";
 import { motion } from "framer-motion";
-import { Upload, Shield, Archive, Sparkles, Car, CreditCard, Home, Smartphone, ShieldCheck, FileText, Loader2 } from "lucide-react";
-import type { ContractType } from "@workspace/contract-types";
+import {
+  Upload,
+  Shield,
+  Archive,
+  Sparkles,
+  Car,
+  CreditCard,
+  Home,
+  Smartphone,
+  ShieldCheck,
+  FileText,
+  Wallet,
+  Building2,
+  Briefcase,
+  MoreHorizontal,
+  Languages,
+} from "lucide-react";
+import {
+  CONTRACT_TYPES,
+  ANALYSIS_LANGUAGE_VALUES,
+  ANALYSIS_LANGUAGE_DISPLAY_NAMES,
+  type ContractType,
+  type AnalysisLanguage,
+} from "@workspace/contract-types";
+import type { PendingUpload } from "@/types/analysis";
 
-const CONTRACT_TYPES: { id: ContractType; label: string; icon: ReactElement }[] = [
-  { id: "auto_finance", label: "تمويل سيارة", icon: <Car size={16} /> },
-  { id: "credit_card", label: "بطاقة ائتمانية", icon: <CreditCard size={16} /> },
-  { id: "mortgage", label: "تمويل عقاري", icon: <Home size={16} /> },
-  { id: "subscription", label: "اشتراك", icon: <Smartphone size={16} /> },
-  { id: "insurance", label: "تأمين", icon: <ShieldCheck size={16} /> },
-  { id: "employment", label: "عقد عمل", icon: <FileText size={16} /> },
-];
+const CONTRACT_TYPE_ICONS: Record<ContractType, ReactElement> = {
+  auto_finance: <Car size={16} />,
+  credit_card: <CreditCard size={16} />,
+  mortgage: <Home size={16} />,
+  personal_finance: <Wallet size={16} />,
+  lease: <Building2 size={16} />,
+  insurance: <ShieldCheck size={16} />,
+  employment: <Briefcase size={16} />,
+  subscription: <Smartphone size={16} />,
+  other: <MoreHorizontal size={16} />,
+};
 
-export default function HomeScreen({ onNavigate }: { onNavigate: (s: string) => void }) {
-  const [selectedType, setSelectedType] = useState<ContractType>("auto_finance");
+export default function HomeScreen({
+  onNavigate,
+  onStartAnalysis,
+}: {
+  onNavigate: (s: string) => void;
+  onStartAnalysis: (upload: PendingUpload) => void;
+}) {
+  const [selectedType, setSelectedType] = useState<ContractType | null>(null);
+  const [analysisLanguage, setAnalysisLanguage] = useState<AnalysisLanguage | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const canAnalyze = Boolean(selectedType && analysisLanguage);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -31,36 +65,23 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (s: string) => 
     setSelectedFile(file);
   }
 
-  async function handleAnalyze() {
+  function handleAnalyze() {
+    if (!selectedType || !analysisLanguage) {
+      return;
+    }
+
     if (!selectedFile) {
       fileInputRef.current?.click();
       return;
     }
 
-    setUploading(true);
     setError(null);
-
-    try {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-      formData.append("userSelectedContractType", selectedType);
-
-      const res = await fetch("/api/analyze-contract", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error((body as { message?: string }).message ?? "فشل رفع الملف");
-      }
-
-      onNavigate("loading");
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "حدث خطأ أثناء الرفع");
-    } finally {
-      setUploading(false);
-    }
+    onStartAnalysis({
+      file: selectedFile,
+      contractType: selectedType,
+      analysisLanguage,
+    });
+    onNavigate("loading");
   }
 
   return (
@@ -132,23 +153,59 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (s: string) => 
       {/* Contract Types */}
       <div className="flex flex-col gap-3">
         <span className="text-xs text-muted-foreground font-semibold px-1">نوع العقد</span>
+        {!selectedType && (
+          <span
+            className="text-xs text-amber-400/90 font-semibold px-1"
+            data-testid="text-contract-type-placeholder"
+          >
+            اختر نوع العقد
+          </span>
+        )}
         <div className="flex flex-wrap gap-2">
           {CONTRACT_TYPES.map((type) => {
-            const isSelected = selectedType === type.id;
+            const isSelected = selectedType === type.value;
             return (
               <motion.button
                 whileTap={{ scale: 0.95 }}
-                key={type.id}
-                data-testid={`chip-contract-type-${type.id}`}
-                onClick={() => setSelectedType(type.id)}
+                key={type.value}
+                data-testid={`chip-contract-type-${type.value}`}
+                onClick={() => setSelectedType(type.value)}
                 className={`h-10 px-4 rounded-full flex items-center gap-2 text-sm transition-all duration-200 ${
                   isSelected
                     ? "bg-[linear-gradient(135deg,#6366F1,#8B5CF6)] text-white shadow-md shadow-indigo-500/25 border-transparent"
                     : "bg-white/5 text-muted-foreground border border-white/10 hover:bg-white/10"
                 }`}
               >
-                <span className="opacity-70">{type.icon}</span>
-                <span className="font-semibold">{type.label}</span>
+                <span className="opacity-70">{CONTRACT_TYPE_ICONS[type.value]}</span>
+                <span className="font-semibold">{type.labelAr}</span>
+              </motion.button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Analysis Language */}
+      <div className="flex flex-col gap-3">
+        <span className="text-xs text-muted-foreground font-semibold px-1 flex items-center gap-1.5">
+          <Languages size={14} />
+          <span>لغة التحليل</span>
+        </span>
+        <div className="flex gap-2">
+          {ANALYSIS_LANGUAGE_VALUES.map((lang) => {
+            const isSelected = analysisLanguage === lang;
+            return (
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                key={lang}
+                data-testid={`chip-analysis-language-${lang}`}
+                onClick={() => setAnalysisLanguage(lang)}
+                className={`flex-1 h-10 px-4 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-200 ${
+                  isSelected
+                    ? "bg-[linear-gradient(135deg,#6366F1,#8B5CF6)] text-white shadow-md shadow-indigo-500/25 border-transparent"
+                    : "bg-white/5 text-muted-foreground border border-white/10 hover:bg-white/10"
+                }`}
+              >
+                {ANALYSIS_LANGUAGE_DISPLAY_NAMES[lang]}
               </motion.button>
             );
           })}
@@ -160,21 +217,12 @@ export default function HomeScreen({ onNavigate }: { onNavigate: (s: string) => 
         whileHover={{ scale: 1.02, boxShadow: "0 0 30px rgba(99,102,241,0.5)" }}
         whileTap={{ scale: 0.98 }}
         onClick={handleAnalyze}
-        disabled={uploading}
+        disabled={!canAnalyze}
         data-testid="button-analyze-contract"
         className="w-full h-[52px] mt-4 rounded-full bg-[linear-gradient(135deg,#6366F1,#8B5CF6)] text-white font-bold text-lg flex items-center justify-center gap-2 shadow-xl shadow-indigo-500/25 disabled:opacity-60 disabled:cursor-not-allowed"
       >
-        {uploading ? (
-          <>
-            <Loader2 size={20} className="animate-spin" />
-            <span>جاري الرفع...</span>
-          </>
-        ) : (
-          <>
-            <span>{selectedFile ? "تحليل العقد" : "اختر ملف PDF"}</span>
-            <Sparkles size={18} />
-          </>
-        )}
+        <span>{!canAnalyze ? "اختر نوع العقد ولغة التحليل" : selectedFile ? "تحليل العقد" : "اختر ملف PDF"}</span>
+        <Sparkles size={18} />
       </motion.button>
 
       {/* Privacy Note */}

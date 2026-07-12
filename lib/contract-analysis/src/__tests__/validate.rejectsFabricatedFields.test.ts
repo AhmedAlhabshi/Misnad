@@ -18,7 +18,7 @@ export function run(): void {
     ],
   };
 
-  const result = validateContractUnderstanding(fabricated);
+  const result = validateContractUnderstanding(fabricated, "irrelevant masked text");
 
   assert.equal(
     result.success,
@@ -32,7 +32,6 @@ export function run(): void {
 
   const valid = {
     contractType: "other",
-    detectedContractType: "other",
     parties: [],
     financialObligations: [],
     dates: [],
@@ -45,7 +44,7 @@ export function run(): void {
     typeDetails: { contractType: "other", description: null },
   };
 
-  const validResult = validateContractUnderstanding(valid);
+  const validResult = validateContractUnderstanding(valid, "irrelevant masked text");
   assert.equal(
     validResult.success,
     true,

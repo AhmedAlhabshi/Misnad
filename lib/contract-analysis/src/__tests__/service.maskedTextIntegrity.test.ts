@@ -25,7 +25,6 @@ export async function run(): Promise<void> {
       return {
         rawText: JSON.stringify({
           contractType: "other",
-          detectedContractType: "other",
           parties: [],
           financialObligations: [],
           dates: [],
@@ -41,7 +40,7 @@ export async function run(): Promise<void> {
     },
   };
 
-  await analyzeContract(maskedText, "other", { provider: fakeProvider });
+  await analyzeContract(maskedText, "other", "ar", { provider: fakeProvider });
 
   assert.ok(capturedFirstPrompt, "provider.generate must have been called");
 

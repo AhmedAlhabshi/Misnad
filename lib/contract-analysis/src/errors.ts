@@ -1,7 +1,9 @@
 export type ContractAnalysisErrorCode =
   | "EMPTY_MASKED_TEXT"
   | "INVALID_CONTRACT_TYPE"
+  | "INVALID_ANALYSIS_LANGUAGE"
   | "MISSING_API_KEY"
+  | "MISSING_OPENROUTER_API_KEY"
   | "NO_USABLE_RESPONSE"
   | "JSON_PARSE_FAILED"
   | "SCHEMA_VALIDATION_FAILED"
@@ -32,10 +34,24 @@ export function invalidContractTypeError(): ContractAnalysisError {
   );
 }
 
+export function invalidAnalysisLanguageError(): ContractAnalysisError {
+  return new ContractAnalysisError(
+    "INVALID_ANALYSIS_LANGUAGE",
+    "analysisLanguage is not a recognized analysis language.",
+  );
+}
+
 export function missingApiKeyError(): ContractAnalysisError {
   return new ContractAnalysisError(
     "MISSING_API_KEY",
     "GEMINI_API_KEY is not configured. Set it before calling the contract analysis service.",
+  );
+}
+
+export function missingOpenRouterApiKeyError(): ContractAnalysisError {
+  return new ContractAnalysisError(
+    "MISSING_OPENROUTER_API_KEY",
+    "OPENROUTER_API_KEY is not configured. Set it before the OpenRouter fallback can be used.",
   );
 }
 
@@ -63,7 +79,7 @@ export function schemaValidationFailedError(): ContractAnalysisError {
 export function providerRequestFailedError(): ContractAnalysisError {
   return new ContractAnalysisError(
     "PROVIDER_REQUEST_FAILED",
-    "Failed to connect to the AI provider.",
+    "The AI provider rejected the analysis request.",
   );
 }
 

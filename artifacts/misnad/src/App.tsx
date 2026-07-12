@@ -6,9 +6,12 @@ import HomeScreen from "./pages/HomeScreen";
 import LoadingScreen from "./pages/LoadingScreen";
 import ResultsScreen from "./pages/ResultsScreen";
 import ArchiveScreen from "./pages/ArchiveScreen";
+import type { PendingUpload, StoredAnalysisResult } from "@/types/analysis";
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState("home");
+  const [pendingUpload, setPendingUpload] = useState<PendingUpload | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<StoredAnalysisResult | null>(null);
 
   useEffect(() => {
     document.documentElement.classList.add("dark");
@@ -19,9 +22,20 @@ function App() {
     <TooltipProvider>
       <div className="min-h-[100dvh] w-full max-w-[480px] mx-auto relative overflow-hidden bg-[#0D1117] text-white selection:bg-indigo-500/30">
         <AnimatePresence mode="wait">
-          {currentScreen === "home" && <HomeScreen key="home" onNavigate={setCurrentScreen} />}
-          {currentScreen === "loading" && <LoadingScreen key="loading" onNavigate={setCurrentScreen} />}
-          {currentScreen === "results" && <ResultsScreen key="results" onNavigate={setCurrentScreen} />}
+          {currentScreen === "home" && (
+            <HomeScreen key="home" onNavigate={setCurrentScreen} onStartAnalysis={setPendingUpload} />
+          )}
+          {currentScreen === "loading" && (
+            <LoadingScreen
+              key="loading"
+              onNavigate={setCurrentScreen}
+              pendingUpload={pendingUpload}
+              onAnalysisComplete={setAnalysisResult}
+            />
+          )}
+          {currentScreen === "results" && (
+            <ResultsScreen key="results" onNavigate={setCurrentScreen} analysisResult={analysisResult} />
+          )}
           {currentScreen === "archive" && <ArchiveScreen key="archive" onNavigate={setCurrentScreen} />}
         </AnimatePresence>
       </div>

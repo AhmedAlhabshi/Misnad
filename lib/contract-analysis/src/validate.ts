@@ -31,19 +31,58 @@ export interface ValidationResult {
   errorSummary?: string;
 }
 
+/**
+ * Validates the model's candidate output against the shared Zod schema,
+ * then enforces one additional integrity rule the schema itself cannot
+ * express: every non-null `importantClauses[].evidence` must be an exact
+ * verbatim substring of `maskedText` (not translated, paraphrased, or
+ * fabricated). A failure here is reported the same way a Zod failure is —
+ * `success: false` with an `errorSummary` — so it flows through the exact
+ * same existing correction/retry attempt as any other validation failure.
+ */
 export function validateContractUnderstanding(
   candidate: unknown,
+  maskedText: string,
 ): ValidationResult {
   const result = contractUnderstandingSchema.safeParse(candidate);
 
-  if (result.success) {
-    return { success: true, data: result.data };
+  if (!result.success) {
+    return {
+      success: false,
+      errorSummary: summarizeZodError(result.error),
+    };
   }
 
-  return {
-    success: false,
-    errorSummary: summarizeZodError(result.error),
-  };
+  const evidenceErrors = findEvidenceIntegrityErrors(result.data, maskedText);
+  if (evidenceErrors.length > 0) {
+    return {
+      success: false,
+      errorSummary: evidenceErrors.join("\n"),
+    };
+  }
+
+  return { success: true, data: result.data };
+}
+
+function findEvidenceIntegrityErrors(
+  data: ContractUnderstanding,
+  maskedText: string,
+): string[] {
+  const errors: string[] = [];
+
+  data.importantClauses.forEach((clause, index) => {
+    if (clause.evidence === null) {
+      return;
+    }
+
+    if (!maskedText.includes(clause.evidence)) {
+      errors.push(
+        `- importantClauses.${index}.evidence: must be an exact verbatim substring of the masked contract text — it was not found (do not translate, paraphrase, or fabricate evidence; use null if no reliable excerpt exists).`,
+      );
+    }
+  });
+
+  return errors;
 }
 
 const MAX_ISSUES_IN_SUMMARY = 10;

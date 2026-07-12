@@ -1,20 +1,8 @@
 import assert from "node:assert/strict";
 import { getContractUnderstandingJsonSchemaFor } from "@workspace/contract-schema";
 
-const OTHER_CONTRACT_TYPE_LITERALS = [
-  "auto_finance",
-  "personal_finance",
-  "mortgage",
-  "credit_card",
-  "lease",
-  "insurance",
-  "employment",
-  "subscription",
-];
-
 // Fields that only exist on other branches' typeDetails — used to prove the
-// "other" branch stays narrowed even though detectedContractType now
-// legitimately references every literal.
+// "other" branch stays narrowed to just its own fields.
 const OTHER_BRANCH_TYPE_DETAIL_FIELDS = [
   "vehicleMake",
   "loanAmount",
@@ -51,10 +39,10 @@ export function run(): void {
     'schema for contractType "other" must still reference the "other" literal itself',
   );
 
-  assert.deepEqual(
-    new Set(schema.properties.detectedContractType.enum),
-    new Set([...OTHER_CONTRACT_TYPE_LITERALS, "other"]),
-    'the "detectedContractType" field must allow the full canonical ContractType enum regardless of the narrowed contractType',
+  assert.equal(
+    "detectedContractType" in schema.properties,
+    false,
+    "there must be no independent AI-detected contract type field in the schema",
   );
 
   console.log("PASS contractSchema.otherType.test.ts");

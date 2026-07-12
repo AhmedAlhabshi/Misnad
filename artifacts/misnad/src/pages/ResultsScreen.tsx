@@ -1,532 +1,656 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, type ReactElement } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronRight,
-  Calendar,
-  Coins,
-  TrendingUp,
-  AlertTriangle,
-  GraduationCap,
-  Sparkles,
+  ChevronDown,
   ShieldAlert,
+  AlertTriangle,
   ShieldCheck,
-  FileSignature,
-  GitCompare,
-  Download,
-  MessageCircle,
-  X,
-  ArrowUp,
-  Bot
+  Users,
+  Calendar,
+  Receipt,
+  Landmark,
+  Hash,
+  HelpCircle,
+  Info,
+  FileWarning,
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import {
+  CONTRACT_TYPE_LABELS_AR,
+  CONTRACT_TYPE_LABELS_EN,
+  type ContractType,
+} from "@workspace/contract-types";
+import { getFieldLabel } from "@/lib/fieldLabels";
+import type {
+  StoredAnalysisResult,
+  ImportantClause,
+  RiskLevel,
+} from "@/types/analysis";
 
-export default function ResultsScreen({ onNavigate }: { onNavigate: (s: string) => void }) {
-  const [activeTab, setActiveTab] = useState<"overview" | "highlights">("overview");
-  const [showSimple, setShowSimple] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [messages, setMessages] = useState<{ id: string; text: string; isAgent: boolean }[]>([]);
-  const [chatInput, setChatInput] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  
-  // Highlight states
-  const [activeHighlight, setActiveHighlight] = useState<number | null>(null);
-  const [pulseHighlight, setPulseHighlight] = useState(false);
-  
-  const { toast } = useToast();
-  const highlightsContainerRef = useRef<HTMLDivElement>(null);
+interface ResultsCopy {
+  back: string;
+  noResult: string;
+  clausesTitle: string;
+  financialObligationsTitle: string;
+  penaltiesTitle: string;
+  feesTitle: string;
+  datesTitle: string;
+  partiesTitle: string;
+  extractedNumbersTitle: string;
+  missingInfoTitle: string;
+  extractionNotesTitle: string;
+  evidenceLabel: string;
+  riskHigh: string;
+  riskMedium: string;
+  riskLow: string;
+  recurring: string;
+  oneTime: string;
+  reasonPrefix: string;
+  months: string;
+  years: string;
+  days: string;
+  percent: string;
+}
 
-  useEffect(() => {
-    if (activeTab === "highlights" && highlightsContainerRef.current) {
-      // Auto-scroll to first red highlight if needed
-      const firstDanger = highlightsContainerRef.current.querySelector('[data-highlight="1"]');
-      if (firstDanger) {
-        firstDanger.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }
-  }, [activeTab]);
+const COPY: Record<"ar" | "en", ResultsCopy> = {
+  ar: {
+    back: "الرئيسية",
+    noResult: "لا توجد نتيجة تحليل متاحة حالياً.",
+    clausesTitle: "البنود التي تحتاج انتباهك",
+    financialObligationsTitle: "الالتزامات المالية",
+    penaltiesTitle: "الغرامات",
+    feesTitle: "الرسوم",
+    datesTitle: "تواريخ مهمة",
+    partiesTitle: "أطراف العقد",
+    extractedNumbersTitle: "أرقام مستخرجة من العقد",
+    missingInfoTitle: "معلومات غير متوفرة في العقد",
+    extractionNotesTitle: "ملاحظات على استخراج النص",
+    evidenceLabel: getFieldLabel("importantClauses.evidence", "ar"),
+    riskHigh: "مرتفع",
+    riskMedium: "متوسط",
+    riskLow: "منخفض",
+    recurring: "متكررة",
+    oneTime: "لمرة واحدة",
+    reasonPrefix: "السبب",
+    months: "شهر",
+    years: "سنة",
+    days: "يوم",
+    percent: "٪",
+  },
+  en: {
+    back: "Home",
+    noResult: "No analysis result is currently available.",
+    clausesTitle: "Clauses that need your attention",
+    financialObligationsTitle: "Financial obligations",
+    penaltiesTitle: "Penalties",
+    feesTitle: "Fees",
+    datesTitle: "Important dates",
+    partiesTitle: "Contract parties",
+    extractedNumbersTitle: "Numbers extracted from the contract",
+    missingInfoTitle: "Information not found in the contract",
+    extractionNotesTitle: "Text extraction notes",
+    evidenceLabel: getFieldLabel("importantClauses.evidence", "en"),
+    riskHigh: "High",
+    riskMedium: "Medium",
+    riskLow: "Low",
+    recurring: "Recurring",
+    oneTime: "One-time",
+    reasonPrefix: "Reason",
+    months: "mo",
+    years: "yr",
+    days: "day(s)",
+    percent: "%",
+  },
+};
 
-  const handleSign = () => {
-    toast({
-      title: "تمت الإضافة للأرشيف",
-      duration: 3000,
-    });
+type OverviewKind = "amount" | "percent" | "months" | "years" | "days";
+
+interface OverviewFieldDef {
+  key: string;
+  kind: OverviewKind;
+}
+
+/**
+ * Which typeDetails fields are shown as compact overview cards, per
+ * contract type. Only real, directly-available structured values — no
+ * derived ratios, scores, or recommendations of any kind.
+ */
+const OVERVIEW_FIELDS_BY_TYPE: Record<ContractType, OverviewFieldDef[]> = {
+  auto_finance: [
+    { key: "financedAmount", kind: "amount" },
+    { key: "monthlyInstallment", kind: "amount" },
+    { key: "loanTermMonths", kind: "months" },
+    { key: "interestRate", kind: "percent" },
+    { key: "downPayment", kind: "amount" },
+    { key: "balloonPayment", kind: "amount" },
+  ],
+  personal_finance: [
+    { key: "loanAmount", kind: "amount" },
+    { key: "monthlyInstallment", kind: "amount" },
+    { key: "loanTermMonths", kind: "months" },
+    { key: "interestRate", kind: "percent" },
+  ],
+  mortgage: [
+    { key: "loanAmount", kind: "amount" },
+    { key: "monthlyInstallment", kind: "amount" },
+    { key: "loanTermYears", kind: "years" },
+    { key: "interestRate", kind: "percent" },
+    { key: "downPayment", kind: "amount" },
+    { key: "propertyValue", kind: "amount" },
+  ],
+  credit_card: [
+    { key: "creditLimit", kind: "amount" },
+    { key: "interestRateApr", kind: "percent" },
+    { key: "annualFee", kind: "amount" },
+    { key: "minimumPaymentPercentage", kind: "percent" },
+  ],
+  lease: [
+    { key: "monthlyRent", kind: "amount" },
+    { key: "securityDeposit", kind: "amount" },
+    { key: "leaseTermMonths", kind: "months" },
+  ],
+  insurance: [
+    { key: "coverageAmount", kind: "amount" },
+    { key: "premiumAmount", kind: "amount" },
+    { key: "deductible", kind: "amount" },
+    { key: "policyTermMonths", kind: "months" },
+  ],
+  employment: [
+    { key: "baseSalary", kind: "amount" },
+    { key: "probationPeriodMonths", kind: "months" },
+    { key: "noticePeriodDays", kind: "days" },
+  ],
+  subscription: [
+    { key: "billingAmount", kind: "amount" },
+    { key: "freeTrialDays", kind: "days" },
+  ],
+  other: [],
+};
+
+function formatOverviewValue(
+  value: number,
+  kind: OverviewKind,
+  copy: ResultsCopy,
+): string {
+  const rounded = Number.isInteger(value) ? String(value) : String(Math.round(value * 100) / 100);
+  switch (kind) {
+    case "percent":
+      return `${rounded}${copy.percent}`;
+    case "months":
+      return `${rounded} ${copy.months}`;
+    case "years":
+      return `${rounded} ${copy.years}`;
+    case "days":
+      return `${rounded} ${copy.days}`;
+    case "amount":
+    default:
+      return rounded;
+  }
+}
+
+function riskRank(level: RiskLevel | null): number {
+  if (level === "high") return 0;
+  if (level === "medium") return 1;
+  if (level === "low") return 2;
+  return 3;
+}
+
+function riskStyles(level: RiskLevel | null): { border: string; badgeBg: string; icon: ReactElement } {
+  if (level === "high") {
+    return {
+      border: "border-red-500",
+      badgeBg: "bg-[linear-gradient(135deg,#EF4444,#F97316)]",
+      icon: <ShieldAlert size={20} />,
+    };
+  }
+  if (level === "medium") {
+    return {
+      border: "border-amber-500",
+      badgeBg: "bg-[linear-gradient(135deg,#F59E0B,#EAB308)]",
+      icon: <AlertTriangle size={20} />,
+    };
+  }
+  if (level === "low") {
+    return {
+      border: "border-emerald-500",
+      badgeBg: "bg-[linear-gradient(135deg,#10B981,#059669)]",
+      icon: <ShieldCheck size={20} />,
+    };
+  }
+  return {
+    border: "border-white/10",
+    badgeBg: "bg-white/10",
+    icon: <Info size={20} />,
   };
+}
 
-  const handleSend = (text: string) => {
-    if (!text.trim()) return;
-    const newMsg = { id: Date.now().toString(), text, isAgent: false };
-    setMessages((prev) => [...prev, newMsg]);
-    setChatInput("");
-    setIsTyping(true);
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return <h2 className="text-base font-bold text-white mb-3">{children}</h2>;
+}
 
-    setTimeout(() => {
-      let reply = "يمكنك مراجعة البند ٥ لمزيد من التفاصيل حول هذا الموضوع. 📄 انتقل للبند في العقد ←";
-      if (text.includes("تأخير")) {
-        reply = "وفقاً للبند ٧، غرامة التأخير تعادل ٢٪ من القسط الشهري عن كل يوم تأخير، بحد أقصى ٢٠٪ من إجمالي القسط. 📄 انتقل للبند في العقد ←";
-      } else if (text.includes("ينتهي")) {
-        reply = "العقد ينتهي في ١٥ يونيو ٢٠٢٩ وفق البند ٣. لكن احذر — يتجدد تلقائياً إذا لم تُخطر البنك قبل ٣٠ يوماً من الانتهاء. 📄 انتقل للبند في العقد ←";
-      } else if (text.includes("تجديد")) {
-        reply = "نعم، البند ١٢ ينص على التجديد التلقائي. هذا هو أخطر بند في عقدك — تأكد من إشعار البنك قبل انتهاء المدة. 📄 انتقل للبند في العقد ←";
-      } else if (text.includes("فسخ")) {
-        reply = "وفق البند ٩، يحق لك فسخ العقد في أي وقت، لكن ستُطبَّق غرامة السداد المبكر (٥٪ من المبلغ المتبقي). 📄 انتقل للبند في العقد ←";
-      }
-      setMessages((prev) => [...prev, { id: Date.now().toString(), text: reply, isAgent: true }]);
-      setIsTyping(false);
-    }, 1200);
-  };
+function ClauseCard({
+  clause,
+  index,
+  lang,
+  copy,
+  expanded,
+  onToggle,
+}: {
+  clause: ImportantClause;
+  index: number;
+  lang: "ar" | "en";
+  copy: ResultsCopy;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const styles = riskStyles(clause.riskLevel);
+  const riskLabel =
+    clause.riskLevel === "high"
+      ? copy.riskHigh
+      : clause.riskLevel === "medium"
+        ? copy.riskMedium
+        : clause.riskLevel === "low"
+          ? copy.riskLow
+          : null;
 
-  const handleLinkClick = () => {
-    setChatOpen(false);
-    setActiveTab("highlights");
-    setPulseHighlight(true);
-    setTimeout(() => setPulseHighlight(false), 2000);
-  };
+  return (
+    <div
+      data-testid={`clause-card-${index}`}
+      className={`bg-white/5 border-r-4 ${styles.border} border-y border-l border-white/10 rounded-[16px] p-4 relative overflow-hidden`}
+    >
+      {riskLabel && (
+        <div
+          className={`absolute top-4 ${lang === "ar" ? "left-4" : "right-4"} h-6 px-3 ${styles.badgeBg} rounded-full text-[11px] font-bold text-white flex items-center`}
+        >
+          {riskLabel}
+        </div>
+      )}
+      <div className="flex gap-3">
+        <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center shrink-0 text-white/80">
+          {styles.icon}
+        </div>
+        <div className="pt-1 flex-1 min-w-0">
+          <h3 className="font-bold text-white text-[15px] mb-1 pr-16">{clause.title}</h3>
+          <p className="text-[13px] text-muted-foreground leading-relaxed">{clause.summary}</p>
 
-  const renderTooltip = () => {
-    if (activeHighlight === null) return null;
-    
-    let content = { title: "", desc: "", icon: <AlertTriangle size={18} />, color: "", borderColor: "" };
-    
-    if (activeHighlight === 1) {
-      content = {
-        title: "غرامة تأخير",
-        desc: "النسبة مرتفعة وتصل إلى 20% كحد أقصى، مما يشكل عبئاً مالياً إضافياً.",
-        icon: <AlertTriangle size={18} />,
-        color: "text-amber-500",
-        borderColor: "border-amber-500/30"
-      };
-    } else if (activeHighlight === 2) {
-      content = {
-        title: "تأمين شامل",
-        desc: "هذا بند إيجابي يحميك من تحمل تكاليف التأمين الإضافية.",
-        icon: <ShieldCheck size={18} />,
-        color: "text-emerald-500",
-        borderColor: "border-emerald-500/30"
-      };
-    } else if (activeHighlight === 3) {
-      content = {
-        title: "غرامة سداد مبكر",
-        desc: "نسبة 5% تعتبر مرتفعة مقارنة بالمتوسط (1-2%).",
-        icon: <AlertTriangle size={18} />,
-        color: "text-amber-500",
-        borderColor: "border-amber-500/30"
-      };
-    } else if (activeHighlight === 4) {
-      content = {
-        title: "تجديد تلقائي",
-        desc: "يجب الانتباه لموعد الإخطار قبل 30 يوماً لتجنب تجديد العقد تلقائياً.",
-        icon: <ShieldAlert size={18} />,
-        color: "text-red-500",
-        borderColor: "border-red-500/30"
-      };
-    }
+          {clause.evidence && (
+            <div className="mt-3">
+              <button
+                onClick={onToggle}
+                data-testid={`button-toggle-evidence-${index}`}
+                className="flex items-center gap-1.5 text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
+              >
+                <motion.span animate={{ rotate: expanded ? 180 : 0 }} className="inline-flex">
+                  <ChevronDown size={14} />
+                </motion.span>
+                {copy.evidenceLabel}
+              </button>
+              <AnimatePresence>
+                {expanded && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <blockquote
+                      dir="auto"
+                      data-testid={`text-evidence-${index}`}
+                      className="mt-2 border-r-2 border-indigo-500/40 pr-3 text-[13px] text-white/70 leading-relaxed italic"
+                    >
+                      {clause.evidence}
+                    </blockquote>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
+export default function ResultsScreen({
+  onNavigate,
+  analysisResult,
+}: {
+  onNavigate: (s: string) => void;
+  analysisResult?: StoredAnalysisResult | null;
+}) {
+  const [expandedEvidence, setExpandedEvidence] = useState<Set<number>>(new Set());
+
+  const lang = analysisResult?.analysisLanguage ?? "ar";
+  const copy = COPY[lang];
+  const isAr = lang === "ar";
+  const analysis = analysisResult?.analysis ?? null;
+
+  if (!analysisResult || !analysis) {
     return (
       <motion.div
-        initial={{ opacity: 0, scale: 0.9, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.9, y: 10 }}
-        className={`fixed left-1/2 -translate-x-1/2 bottom-24 w-[280px] bg-[#161B22]/95 backdrop-blur-xl border border-white/10 rounded-xl p-4 z-30 shadow-2xl shadow-black/50 ${content.borderColor} border-b-4`}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        dir={isAr ? "rtl" : "ltr"}
+        className="flex flex-col items-center justify-center min-h-screen gap-4 p-6 text-center"
       >
-        <div className="flex justify-between items-start mb-2">
-          <div className={`flex items-center gap-2 font-bold ${content.color}`}>
-            {content.icon}
-            <span>{content.title}</span>
-          </div>
-          <button onClick={() => setActiveHighlight(null)} className="text-muted-foreground hover:text-white">
-            <X size={16} />
-          </button>
-        </div>
-        <p className="text-[13px] text-white/80 leading-relaxed font-medium">
-          {content.desc}
-        </p>
+        <FileWarning size={40} className="text-muted-foreground" />
+        <p className="text-white/80">{copy.noResult}</p>
+        <button
+          onClick={() => onNavigate("home")}
+          data-testid="button-back-home-from-results"
+          className="h-11 px-6 rounded-full bg-[linear-gradient(135deg,#6366F1,#8B5CF6)] text-white font-bold"
+        >
+          {copy.back}
+        </button>
       </motion.div>
     );
-  };
+  }
+
+  function toggleEvidence(index: number) {
+    setExpandedEvidence((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  }
+
+  const contractTypeLabel = isAr
+    ? CONTRACT_TYPE_LABELS_AR[analysis.contractType]
+    : CONTRACT_TYPE_LABELS_EN[analysis.contractType];
+
+  const overviewFields = OVERVIEW_FIELDS_BY_TYPE[analysis.contractType] ?? [];
+  const overviewCards = overviewFields
+    .map((def) => ({ def, value: analysis.typeDetails[def.key] }))
+    .filter((entry): entry is { def: OverviewFieldDef; value: number } => typeof entry.value === "number");
+
+  const sortedClauses = [...analysis.importantClauses].sort(
+    (a, b) => riskRank(a.riskLevel) - riskRank(b.riskLevel),
+  );
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
+      dir={isAr ? "rtl" : "ltr"}
       className="flex flex-col h-[100dvh] relative"
     >
       {/* Top Header */}
-      <div className="pt-6 pb-2 px-6 flex justify-between items-center bg-[#0D1117]/80 backdrop-blur-md sticky top-0 z-10">
+      <div className="pt-6 pb-4 px-6 flex justify-between items-center bg-[#0D1117]/80 backdrop-blur-md sticky top-0 z-10 border-b border-white/5">
         <button
           onClick={() => onNavigate("home")}
+          data-testid="button-back-home"
           className="h-8 px-3 rounded-full bg-white/5 border border-white/10 flex items-center gap-1 text-sm font-semibold text-white"
         >
-          <ChevronRight size={16} />
-          <span>الرئيسية</span>
+          <ChevronRight size={16} className={isAr ? "" : "rotate-180"} />
+          <span>{copy.back}</span>
         </button>
-        <span className="text-xs text-muted-foreground">قبل دقيقتين</span>
+        <span className="text-xs text-muted-foreground truncate max-w-[45%]">
+          {analysisResult.fileName}
+        </span>
       </div>
 
-      {/* Tabs */}
-      <div className="px-6 flex gap-4 border-b border-white/10 sticky top-[64px] bg-[#0D1117]/80 backdrop-blur-md z-10 pt-2">
-        <button
-          onClick={() => { setActiveTab("overview"); setActiveHighlight(null); }}
-          className={`pb-3 text-sm font-bold border-b-2 transition-colors ${
-            activeTab === "overview" ? "border-indigo-500 text-indigo-400" : "border-transparent text-muted-foreground"
-          }`}
-        >
-          📊 نظرة عامة
-        </button>
-        <button
-          onClick={() => setActiveTab("highlights")}
-          className={`pb-3 text-sm font-bold border-b-2 transition-colors ${
-            activeTab === "highlights" ? "border-indigo-500 text-indigo-400" : "border-transparent text-muted-foreground"
-          }`}
-        >
-          📄 العقد المُعلَّم
-        </button>
-      </div>
+      <div className="flex-1 overflow-y-auto pb-10 px-6 pt-5 flex flex-col gap-8">
+        {/* 4.1 Header / contract overview */}
+        <div>
+          <h1 className="text-[22px] font-bold text-white" data-testid="text-contract-type-heading">
+            {contractTypeLabel}
+          </h1>
+        </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto pb-24 px-6 pt-4" ref={highlightsContainerRef}>
-        {activeTab === "overview" && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-6">
-            <h1 className="text-[22px] font-bold text-white">عقد تمويل سيارة — البنك الأهلي</h1>
+        {/* 4.2 Dynamic overview cards */}
+        {overviewCards.length > 0 && (
+          <div className="grid grid-cols-2 gap-3" data-testid="overview-cards">
+            {overviewCards.map(({ def, value }) => (
+              <div
+                key={def.key}
+                data-testid={`overview-card-${def.key}`}
+                className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-1"
+              >
+                <span className="text-xs text-muted-foreground">{getFieldLabel(`typeDetails.${def.key}`, lang)}</span>
+                <span className="text-xl font-bold text-white">{formatOverviewValue(value, def.kind, copy)}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
-            {/* Risk Row */}
-            <div className="flex justify-between items-center bg-white/5 border border-white/10 rounded-2xl p-4">
-              <div className="relative w-20 h-20">
-                <svg className="w-full h-full -rotate-90">
-                  <circle cx="40" cy="40" r="36" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="6" />
-                  <motion.circle
-                    cx="40"
-                    cy="40"
-                    r="36"
-                    fill="none"
-                    stroke="url(#danger-grad)"
-                    strokeWidth="6"
-                    strokeLinecap="round"
-                    strokeDasharray="226"
-                    initial={{ strokeDashoffset: 226 }}
-                    animate={{ strokeDashoffset: 226 - (226 * 0.74) }}
-                    transition={{ duration: 1.5, ease: "easeOut" }}
-                  />
-                  <defs>
-                    <linearGradient id="danger-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#EF4444" />
-                      <stop offset="100%" stopColor="#F97316" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-xl font-bold text-white leading-none">74</span>
-                  <span className="text-[10px] text-muted-foreground">من 100</span>
-                </div>
-              </div>
-              <div className="flex flex-col items-end gap-1">
-                <span className="text-xs text-muted-foreground">مستوى المخاطرة</span>
-                <div className="h-10 px-4 rounded-full bg-[linear-gradient(135deg,#EF4444,#F97316)] flex items-center text-white font-bold text-sm shadow-[0_0_15px_rgba(239,68,68,0.4)] animate-pulse">
-                  مرتفع
-                </div>
-                <span className="text-xs text-muted-foreground">74/100 نقطة</span>
-              </div>
+        {/* 4.3 Clauses that need your attention */}
+        {sortedClauses.length > 0 && (
+          <div>
+            <SectionHeading>{copy.clausesTitle}</SectionHeading>
+            <div className="flex flex-col gap-3">
+              {sortedClauses.map((clause, index) => (
+                <ClauseCard
+                  key={index}
+                  clause={clause}
+                  index={index}
+                  lang={lang}
+                  copy={copy}
+                  expanded={expandedEvidence.has(index)}
+                  onToggle={() => toggleEvidence(index)}
+                />
+              ))}
             </div>
+          </div>
+        )}
 
-            {/* Stats Row */}
-            <div className="flex gap-3 overflow-x-auto pb-2 -mx-6 px-6 hide-scrollbar">
-              <div className="flex-shrink-0 w-[110px] bg-white/5 border border-white/10 rounded-[20px] p-3 flex flex-col items-center justify-center aspect-square text-center">
-                <div className="w-10 h-10 rounded-full bg-[linear-gradient(135deg,#3B82F6,#60A5FA)] flex items-center justify-center text-white mb-2">
-                  <Calendar size={18} />
-                </div>
-                <div className="text-2xl font-bold text-white leading-none">60<span className="text-xs font-normal ml-1">شهر</span></div>
-                <div className="text-xs text-muted-foreground mt-1">مدة العقد</div>
-              </div>
-              <div className="flex-shrink-0 w-[110px] bg-white/5 border border-white/10 rounded-[20px] p-3 flex flex-col items-center justify-center aspect-square text-center">
-                <div className="w-10 h-10 rounded-full bg-[linear-gradient(135deg,#6366F1,#8B5CF6)] flex items-center justify-center text-white mb-2">
-                  <Coins size={18} />
-                </div>
-                <div className="text-2xl font-bold text-white leading-none">142K<sup className="text-[10px] font-normal ml-0.5">رس</sup></div>
-                <div className="text-xs text-muted-foreground mt-1">إجمالي التكلفة</div>
-              </div>
-              <div className="flex-shrink-0 w-[110px] bg-white/5 border border-white/10 rounded-[20px] p-3 flex flex-col items-center justify-center aspect-square text-center">
-                <div className="w-10 h-10 rounded-full bg-[linear-gradient(135deg,#F59E0B,#EAB308)] flex items-center justify-center text-white mb-2">
-                  <TrendingUp size={18} />
-                </div>
-                <div className="text-2xl font-bold text-amber-500 leading-none">18.4%</div>
-                <div className="text-xs text-muted-foreground mt-1">نسبة الفائدة</div>
-              </div>
-              <div className="flex-shrink-0 w-[110px] bg-white/5 border border-white/10 rounded-[20px] p-3 flex flex-col items-center justify-center aspect-square text-center">
-                <div className="w-10 h-10 rounded-full bg-[linear-gradient(135deg,#EF4444,#F97316)] flex items-center justify-center text-white mb-2">
-                  <AlertTriangle size={18} />
-                </div>
-                <div className="text-2xl font-bold text-red-500 leading-none">3</div>
-                <div className="text-xs text-muted-foreground mt-1">بنود خطيرة</div>
-              </div>
-            </div>
-
-            {/* Explain Like 15 */}
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setShowSimple(!showSimple)}
-              className="w-full h-[52px] rounded-full bg-[linear-gradient(135deg,#F59E0B,#ea580c)] flex items-center justify-center gap-2 text-white font-bold shadow-lg shadow-amber-500/20"
-            >
-              <GraduationCap size={20} />
-              <span>اشرحها كأني عمري 15</span>
-              <Sparkles size={16} />
-            </motion.button>
-
-            <AnimatePresence>
-              {showSimple && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, height: "auto", scale: 1 }}
-                  exit={{ opacity: 0, height: 0, scale: 0.95 }}
-                  className="bg-white/5 border-r-4 border-indigo-500 border-y border-l border-white/10 rounded-xl p-4 overflow-hidden"
+        {/* 4.4 Financial obligations */}
+        {analysis.financialObligations.length > 0 && (
+          <div>
+            <SectionHeading>{copy.financialObligationsTitle}</SectionHeading>
+            <div className="flex flex-col gap-2">
+              {analysis.financialObligations.map((item, index) => (
+                <div
+                  key={index}
+                  data-testid={`financial-obligation-${index}`}
+                  className="bg-white/5 border border-white/10 rounded-[16px] p-4 flex items-start gap-3"
                 >
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
-                      <Bot size={18} />
-                    </div>
-                    <span className="font-bold text-white text-sm">✨ بلغة بسيطة</span>
+                  <div className="w-9 h-9 rounded-full bg-indigo-500/15 text-indigo-400 flex items-center justify-center shrink-0">
+                    <Landmark size={16} />
                   </div>
-                  <p className="text-[15px] leading-relaxed text-indigo-100/90 font-medium">
-                    تخيّل إنك استأجرت سيارة من صاحبك لخمس سنين. كل شهر تدفع له مبلغ. لكن في الورقة اللي وقّعت عليها مكتوب: لو حبيت تخلص بدري، لازم تدفع غرامة كبيرة. وكمان، لما تخلص الخمس سنين، تلقائياً تتجدد لخمس سنين ثانية إلا إذا قلت لا قبل وقت. باختصار: العقد يميل لصالح البنك أكثر منك. فاحذر قبل التوقيع.
-                  </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Findings */}
-            <div>
-              <h2 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-                <span className="text-xl">🔍</span> البنود التي تحتاج انتباهك
-              </h2>
-              <div className="flex flex-col gap-3">
-                <div className="bg-white/5 border-r-4 border-red-500 border-y border-l border-white/10 rounded-[16px] p-4 relative overflow-hidden">
-                  <div className="absolute top-4 left-4 h-6 px-3 bg-[linear-gradient(135deg,#EF4444,#F97316)] rounded-full text-[11px] font-bold text-white flex items-center">خطر عالٍ</div>
-                  <div className="flex gap-3">
-                    <div className="w-10 h-10 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center shrink-0">
-                      <ShieldAlert size={20} />
-                    </div>
-                    <div className="pt-1">
-                      <h3 className="font-bold text-white text-[15px] mb-1">تجديد تلقائي بدون إشعار</h3>
-                      <p className="text-[13px] text-muted-foreground leading-relaxed">يحق للبنك تجديد العقد تلقائياً دون إشعارك قبل انتهاء المدة، مما قد يربطك بفترة جديدة كاملة.</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[14px] text-white font-semibold">{item.description}</p>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-xs text-muted-foreground">
+                      {item.amount !== null && (
+                        <span>
+                          {item.amount}
+                          {item.currency ? ` ${item.currency}` : ""}
+                        </span>
+                      )}
+                      {item.frequency && <span>{item.frequency}</span>}
+                      {item.dueDate && <span>{item.dueDate}</span>}
                     </div>
                   </div>
                 </div>
-
-                <div className="bg-white/5 border-r-4 border-amber-500 border-y border-l border-white/10 rounded-[16px] p-4 relative overflow-hidden">
-                  <div className="absolute top-4 left-4 h-6 px-3 bg-[linear-gradient(135deg,#F59E0B,#EAB308)] rounded-full text-[11px] font-bold text-white flex items-center">تحذير</div>
-                  <div className="flex gap-3">
-                    <div className="w-10 h-10 rounded-full bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0">
-                      <AlertTriangle size={20} />
-                    </div>
-                    <div className="pt-1">
-                      <h3 className="font-bold text-white text-[15px] mb-1">غرامة سداد مبكر مرتفعة</h3>
-                      <p className="text-[13px] text-muted-foreground leading-relaxed">في حال السداد المبكر، تدفع غرامة تعادل 5% من المبلغ المتبقي بدلاً من النسبة المعتادة 1%.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white/5 border-r-4 border-emerald-500 border-y border-l border-white/10 rounded-[16px] p-4 relative overflow-hidden">
-                  <div className="absolute top-4 left-4 h-6 px-3 bg-[linear-gradient(135deg,#10B981,#059669)] rounded-full text-[11px] font-bold text-white flex items-center">آمن</div>
-                  <div className="flex gap-3">
-                    <div className="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0">
-                      <ShieldCheck size={20} />
-                    </div>
-                    <div className="pt-1">
-                      <h3 className="font-bold text-white text-[15px] mb-1">بند التأمين الشامل مضمون</h3>
-                      <p className="text-[13px] text-muted-foreground leading-relaxed">العقد يضمن تأميناً شاملاً للسيارة طوال فترة التمويل دون رسوم إضافية.</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              ))}
             </div>
-
-            {/* Actions */}
-            <div className="flex gap-2 mt-4">
-              <button onClick={handleSign} className="flex-1 h-11 rounded-xl bg-[linear-gradient(135deg,#6366F1,#8B5CF6)] flex items-center justify-center gap-2 text-white text-sm font-bold shadow-lg shadow-indigo-500/20 hover:scale-[1.02] transition-transform">
-                <FileSignature size={16} />
-                <span>وقّعت على هذا العقد</span>
-              </button>
-              <button className="flex-1 h-11 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center gap-2 text-white text-sm font-bold hover:bg-white/10 transition-colors">
-                <GitCompare size={16} />
-                <span>مقارنة بعقد آخر</span>
-              </button>
-              <button className="w-11 h-11 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white hover:bg-white/10 transition-colors">
-                <Download size={18} />
-              </button>
-            </div>
-          </motion.div>
+          </div>
         )}
 
-        {activeTab === "highlights" && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-4 relative">
-            <div className="flex gap-2">
-              <span className="px-3 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded-full text-xs font-bold">🔴 3 خطيرة</span>
-              <span className="px-3 py-1 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full text-xs font-bold">🟡 2 تحذير</span>
-              <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full text-xs font-bold">🟢 1 آمن</span>
+        {/* 4.5 Penalties */}
+        {analysis.penalties.length > 0 && (
+          <div>
+            <SectionHeading>{copy.penaltiesTitle}</SectionHeading>
+            <div className="flex flex-col gap-2">
+              {analysis.penalties.map((item, index) => (
+                <div
+                  key={index}
+                  data-testid={`penalty-${index}`}
+                  className="bg-white/5 border-r-4 border-amber-500 border-y border-l border-white/10 rounded-[16px] p-4"
+                >
+                  <p className="text-[14px] text-white font-semibold">{item.description}</p>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-xs text-muted-foreground">
+                    {item.amount !== null && (
+                      <span>
+                        {item.amount}
+                        {item.currency ? ` ${item.currency}` : ""}
+                      </span>
+                    )}
+                    {item.condition && <span>{item.condition}</span>}
+                  </div>
+                </div>
+              ))}
             </div>
-            
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-5 text-sm text-white/90 leading-[2.2] text-justify font-medium">
-              يتفق الطرفان على أن يقوم الطرف الأول (البنك) بتمويل شراء المركبة الموصوفة أعلاه للطرف الثاني. 
-              يلتزم الطرف الثاني بسداد الأقساط في موعدها المحدد، وفي حال التأخر 
-              <span 
-                onClick={() => setActiveHighlight(1)}
-                className={`bg-amber-500/20 border-b-2 border-amber-500 px-1 rounded-t cursor-pointer mx-1 transition-all ${activeHighlight === 1 ? 'ring-2 ring-amber-500/50 bg-amber-500/30' : ''}`}>
-                تُطبق غرامة تأخير قدرها ٢٪ من قيمة القسط<sup className="ml-0.5 font-bold">①</sup>
-              </span>.
-              <br/><br/>
-              كما يتعهد البنك بأن 
-              <span 
-                onClick={() => setActiveHighlight(2)}
-                className={`bg-emerald-500/15 border-b-2 border-emerald-500 px-1 rounded-t cursor-pointer mx-1 transition-all ${activeHighlight === 2 ? 'ring-2 ring-emerald-500/50 bg-emerald-500/30' : ''}`}>
-                يوفر تأميناً شاملاً للمركبة طوال مدة العقد دون تحميل الطرف الثاني أي رسوم إضافية<sup className="ml-0.5 font-bold">②</sup>
-              </span>.
-              <br/><br/>
-              يحق للطرف الثاني السداد المبكر لقيمة التمويل المتبقية، وفي هذه الحالة 
-              <span 
-                onClick={() => setActiveHighlight(3)}
-                className={`bg-amber-500/20 border-b-2 border-amber-500 px-1 rounded-t cursor-pointer mx-1 transition-all ${activeHighlight === 3 ? 'ring-2 ring-amber-500/50 bg-amber-500/30' : ''}`}>
-                يتحمل غرامة سداد مبكر تعادل ٥٪ من المبلغ المتبقي<sup className="ml-0.5 font-bold">③</sup>
-              </span>.
-              <br/><br/>
-              مدة هذا العقد ٦٠ شهراً، و
-              <span 
-                data-highlight="1"
-                onClick={() => setActiveHighlight(4)}
-                className={`bg-red-500/25 border-b-2 border-red-500 px-1 rounded-t cursor-pointer mx-1 font-bold transition-all ${pulseHighlight ? 'animate-pulse ring-4 ring-red-500/50 bg-red-500/40' : ''} ${activeHighlight === 4 ? 'ring-2 ring-red-500/50 bg-red-500/40' : ''}`}>
-                يُجدد العقد تلقائياً لمدة مماثلة ما لم يقم الطرف الثاني بإخطار البنك خطياً برغبته في عدم التجديد قبل ٣٠ يوماً من تاريخ الانتهاء<sup className="ml-0.5 font-bold">④</sup>
-              </span>.
-            </div>
+          </div>
+        )}
 
-            <AnimatePresence>
-              {renderTooltip()}
-            </AnimatePresence>
-          </motion.div>
+        {/* 4.6 Fees */}
+        {analysis.fees.length > 0 && (
+          <div>
+            <SectionHeading>{copy.feesTitle}</SectionHeading>
+            <div className="flex flex-col gap-2">
+              {analysis.fees.map((item, index) => (
+                <div
+                  key={index}
+                  data-testid={`fee-${index}`}
+                  className="bg-white/5 border border-white/10 rounded-[16px] p-4 flex items-start gap-3"
+                >
+                  <div className="w-9 h-9 rounded-full bg-white/10 text-white/70 flex items-center justify-center shrink-0">
+                    <Receipt size={16} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[14px] text-white font-semibold">{item.description}</p>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-xs text-muted-foreground">
+                      {item.amount !== null && (
+                        <span>
+                          {item.amount}
+                          {item.currency ? ` ${item.currency}` : ""}
+                        </span>
+                      )}
+                      {item.isRecurring !== null && (
+                        <span>{item.isRecurring ? copy.recurring : copy.oneTime}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 4.7 Important dates */}
+        {analysis.dates.length > 0 && (
+          <div>
+            <SectionHeading>{copy.datesTitle}</SectionHeading>
+            <div className="flex flex-col gap-2">
+              {analysis.dates.map((item, index) => (
+                <div
+                  key={index}
+                  data-testid={`date-item-${index}`}
+                  className="bg-white/5 border border-white/10 rounded-[16px] p-4 flex items-center gap-3"
+                >
+                  <div className="w-9 h-9 rounded-full bg-blue-500/15 text-blue-400 flex items-center justify-center shrink-0">
+                    <Calendar size={16} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[14px] text-white font-semibold">{item.label}</p>
+                    <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+                      {item.date && <span>{item.date}</span>}
+                      {item.notes && <span>{item.notes}</span>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 4.8 Contract parties */}
+        {analysis.parties.length > 0 && (
+          <div>
+            <SectionHeading>{copy.partiesTitle}</SectionHeading>
+            <div className="flex flex-col gap-2">
+              {analysis.parties.map((item, index) => (
+                <div
+                  key={index}
+                  data-testid={`party-${index}`}
+                  className="bg-white/5 border border-white/10 rounded-[16px] p-4 flex items-start gap-3"
+                >
+                  <div className="w-9 h-9 rounded-full bg-purple-500/15 text-purple-400 flex items-center justify-center shrink-0">
+                    <Users size={16} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[14px] text-white font-semibold">{item.role}</p>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-xs text-muted-foreground">
+                      {item.name && <span>{item.name}</span>}
+                      {item.identifier && <span>{item.identifier}</span>}
+                      {item.notes && <span>{item.notes}</span>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 4.9 Extracted numbers */}
+        {analysis.extractedNumbers.length > 0 && (
+          <div>
+            <SectionHeading>{copy.extractedNumbersTitle}</SectionHeading>
+            <div className="flex flex-wrap gap-2">
+              {analysis.extractedNumbers.map((item, index) => (
+                <div
+                  key={index}
+                  data-testid={`extracted-number-${index}`}
+                  className="bg-white/5 border border-white/10 rounded-full px-3 py-1.5 flex items-center gap-2 text-xs"
+                >
+                  <Hash size={12} className="text-muted-foreground" />
+                  <span className="text-muted-foreground">{item.label}:</span>
+                  <span className="text-white font-semibold">
+                    {item.value}
+                    {item.unit ? ` ${item.unit}` : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 4.10 Missing information */}
+        {analysis.missingInformation.length > 0 && (
+          <div>
+            <SectionHeading>{copy.missingInfoTitle}</SectionHeading>
+            <div className="flex flex-col gap-2">
+              {analysis.missingInformation.map((item, index) => (
+                <div
+                  key={index}
+                  data-testid={`missing-info-${index}`}
+                  className="bg-white/5 border border-white/10 rounded-[16px] p-3 flex items-start gap-3"
+                >
+                  <div className="w-7 h-7 rounded-full bg-white/10 text-muted-foreground flex items-center justify-center shrink-0 mt-0.5">
+                    <HelpCircle size={14} />
+                  </div>
+                  <div className="flex-1 min-w-0 text-[13px]">
+                    <span className="text-white/90 font-medium">{getFieldLabel(item.field, lang)}</span>
+                    {item.reason && (
+                      <span className="text-muted-foreground">
+                        {" — "}
+                        {item.reason}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 4.11 Extraction notes */}
+        {analysis.extractionNotes && (
+          <div
+            data-testid="extraction-notes"
+            className="bg-white/5 border border-white/10 rounded-xl p-4 flex gap-3"
+          >
+            <Info size={18} className="text-muted-foreground shrink-0 mt-0.5" />
+            <p className="text-[13px] text-muted-foreground leading-relaxed">{analysis.extractionNotes}</p>
+          </div>
         )}
       </div>
-
-      {/* Floating Chat Button */}
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={() => setChatOpen(true)}
-        className="fixed bottom-6 left-6 w-14 h-14 rounded-full bg-[linear-gradient(135deg,#6366F1,#8B5CF6)] text-white shadow-xl shadow-indigo-500/30 flex items-center justify-center z-40"
-      >
-        <MessageCircle size={28} />
-        <span className="absolute top-0 right-0 w-3 h-3 bg-amber-400 rounded-full border-2 border-[#0D1117] animate-ping" />
-        <span className="absolute top-0 right-0 w-3 h-3 bg-amber-400 rounded-full border-2 border-[#0D1117]" />
-      </motion.button>
-
-      {/* Bottom Sheet Chat */}
-      <AnimatePresence>
-        {chatOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setChatOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
-            />
-            <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="fixed bottom-0 left-0 right-0 h-[60vh] max-w-[480px] mx-auto bg-[#161B22]/95 backdrop-blur-xl border-t border-white/10 rounded-t-[24px] z-50 flex flex-col"
-            >
-              <div className="flex justify-between items-center p-4 border-b border-white/10">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400">
-                    <Bot size={18} />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-white text-sm">🤖 اسأل عن عقدك</h3>
-                    <p className="text-[11px] text-muted-foreground">يجاوب بناءً على نص العقد فقط</p>
-                  </div>
-                </div>
-                <button onClick={() => setChatOpen(false)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/70">
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-                {messages.length === 0 ? (
-                  <div className="flex flex-col gap-2 mt-auto">
-                    {["ما هي غرامة التأخير؟", "متى ينتهي العقد؟", "هل يوجد تجديد تلقائي؟", "ما حقوقي إذا أردت الفسخ؟"].map((q, i) => (
-                      <button
-                        key={i}
-                        onClick={() => handleSend(q)}
-                        className="self-start px-4 py-2 rounded-full bg-white/5 border border-white/10 text-sm text-white/80 hover:bg-white/10 transition-colors text-right"
-                      >
-                        {q}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <>
-                    {messages.map((msg) => (
-                      <div key={msg.id} className={`flex ${msg.isAgent ? "justify-start" : "justify-end"}`}>
-                        {msg.isAgent && (
-                          <div className="w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center text-white text-[10px] font-bold shrink-0 ml-2 mt-1">م</div>
-                        )}
-                        <div
-                          className={`max-w-[80%] p-3 text-sm leading-relaxed ${
-                            msg.isAgent
-                              ? "bg-white/5 text-white/90 rounded-[18px] rounded-tr-sm"
-                              : "bg-[linear-gradient(135deg,#6366F1,#8B5CF6)] text-white rounded-[18px] rounded-tl-sm"
-                          }`}
-                        >
-                          {msg.text.includes("انتقل للبند") ? (
-                            <>
-                              {msg.text.split("📄")[0]}
-                              <span
-                                onClick={handleLinkClick}
-                                className="block mt-2 text-indigo-300 font-bold cursor-pointer hover:text-indigo-200"
-                              >
-                                📄 انتقل للبند في العقد ←
-                              </span>
-                            </>
-                          ) : (
-                            msg.text
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                    {isTyping && (
-                      <div className="flex justify-start">
-                        <div className="w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center text-white text-[10px] font-bold shrink-0 ml-2 mt-1">م</div>
-                        <div className="bg-white/5 p-3 rounded-[18px] rounded-tr-sm flex gap-1 items-center">
-                          <span className="w-1.5 h-1.5 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                          <span className="w-1.5 h-1.5 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                          <span className="w-1.5 h-1.5 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-
-              <div className="p-4 pt-2 border-t border-white/10 bg-[#161B22]">
-                <div className="relative flex items-center">
-                  <input
-                    type="text"
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSend(chatInput)}
-                    placeholder="اسأل أي سؤال عن عقدك..."
-                    className="w-full h-[48px] bg-white/5 border border-white/10 rounded-full pl-12 pr-4 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:border-indigo-500/50"
-                  />
-                  <button
-                    onClick={() => handleSend(chatInput)}
-                    className="absolute left-1.5 w-[36px] h-[36px] rounded-full bg-indigo-500 flex items-center justify-center text-white hover:bg-indigo-400 transition-colors"
-                  >
-                    <ArrowUp size={18} />
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
     </motion.div>
   );
 }

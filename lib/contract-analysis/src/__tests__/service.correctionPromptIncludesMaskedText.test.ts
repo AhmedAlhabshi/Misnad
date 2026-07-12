@@ -28,7 +28,6 @@ export async function run(): Promise<void> {
       return {
         rawText: JSON.stringify({
           contractType: "other",
-          detectedContractType: "other",
           parties: [],
           financialObligations: [],
           dates: [],
@@ -44,7 +43,7 @@ export async function run(): Promise<void> {
     },
   };
 
-  const result = await analyzeContract(maskedText, "other", {
+  const result = await analyzeContract(maskedText, "other", "ar", {
     provider: fakeProvider,
   });
 
@@ -62,7 +61,6 @@ export async function run(): Promise<void> {
   );
 
   assert.equal(result.contractType, "other");
-  assert.equal(result.detectedContractType, "other");
 
   console.log("PASS service.correctionPromptIncludesMaskedText.test.ts");
 }

@@ -16,11 +16,11 @@ export interface ContractTypeDefinition {
 }
 
 export const CONTRACT_TYPES: readonly ContractTypeDefinition[] = [
-  { value: "auto_finance", labelAr: "تمويل سيارات", labelEn: "Auto Finance" },
+  { value: "auto_finance", labelAr: "تمويل سيارة", labelEn: "Auto Finance" },
   { value: "personal_finance", labelAr: "تمويل شخصي", labelEn: "Personal Finance" },
   { value: "mortgage", labelAr: "تمويل عقاري", labelEn: "Mortgage" },
   { value: "credit_card", labelAr: "بطاقة ائتمانية", labelEn: "Credit Card" },
-  { value: "lease", labelAr: "إيجار", labelEn: "Lease" },
+  { value: "lease", labelAr: "عقد إيجار", labelEn: "Lease" },
   { value: "insurance", labelAr: "تأمين", labelEn: "Insurance" },
   { value: "employment", labelAr: "عقد عمل", labelEn: "Employment Contract" },
   { value: "subscription", labelAr: "اشتراك", labelEn: "Subscription" },
@@ -48,4 +48,18 @@ export function isContractType(value: unknown): value is ContractType {
     typeof value === "string" &&
     CONTRACT_TYPE_VALUES.includes(value as ContractType)
   );
+}
+
+export type AnalysisLanguage = "ar" | "en";
+
+export const ANALYSIS_LANGUAGE_VALUES: readonly AnalysisLanguage[] = ["ar", "en"];
+
+/** Each language's own display name, shown as-is regardless of current UI language. */
+export const ANALYSIS_LANGUAGE_DISPLAY_NAMES: Record<AnalysisLanguage, string> = {
+  ar: "العربية",
+  en: "English",
+};
+
+export function isAnalysisLanguage(value: unknown): value is AnalysisLanguage {
+  return typeof value === "string" && ANALYSIS_LANGUAGE_VALUES.includes(value as AnalysisLanguage);
 }
