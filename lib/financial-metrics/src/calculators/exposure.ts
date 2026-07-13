@@ -3,6 +3,12 @@ import type { FeeCollection, FeeItem } from "../fee";
 import type { MoneyMetric } from "../moneyMetric";
 import type { PaymentObligation } from "../paymentObligation";
 import type { PenaltyCollection } from "../penalty";
+import {
+  isGuaranteed,
+  isNormalPathExposureComponent,
+  selectEligibleMandatoryFeeItems,
+  selectEligibleOneTimeObligations,
+} from "../pipeline/eligibility";
 import type { RecurringCommitment } from "../recurringCommitment";
 import { knownMoney, maxKnownMoneyMetric, sumKnownMoneyMetrics } from "../utils/metricFactories";
 import { emptyMetadata, type CalculatorMetadata } from "./metadata";
@@ -36,6 +42,8 @@ export function calculateExposure(
   recurringCommitment: RecurringCommitment,
   calculatedCoreObligations: MoneyMetric,
   insuranceDeductible: MoneyMetric,
+  obligationRefundability: ReadonlyMap<string, boolean | null>,
+  totalScheduledRecurring: MoneyMetric,
 ): { result: Exposure; metadata: CalculatorMetadata } {
   const upfrontObligationAmounts = obligations
     .filter((obligation) => obligation.mandatory === true && obligation.frequency === "one_time")
@@ -61,16 +69,48 @@ export function calculateExposure(
       ? null
       : hasUnresolvedConditionalFee || hasUnresolvedConditionalPenalty;
 
-  const allKnownAmounts: MoneyMetric[] = [
-    ...obligations.map((obligation) => obligation.amount),
-    ...feeItems.map((item) => item.amount),
-    ...penalties.items.map((item) => item.amount),
-  ];
+  // `maximumSinglePayment` is strictly "eligible actual payment obligations
+  // and mandatory fees" (guaranteed: mandatory, non-conditional) — the same
+  // strict gate `costs.ts` uses for `calculatedCoreObligations`, so it is
+  // never inflated by asset values, principal, scenario amounts, or
+  // conditional/optional charges (see `pipeline/eligibility.ts`).
+  const { eligible: guaranteedOneTimeObligations } = selectEligibleOneTimeObligations(obligations, obligationRefundability);
+  const { eligible: guaranteedMandatoryFees } = selectEligibleMandatoryFeeItems(feeItems);
   const maximumSinglePayment = maxKnownMoneyMetric(
-    allKnownAmounts,
-    "maximum known single payment across obligations, fees, and penalties",
-    "no obligation, fee, or penalty has a fully known amount",
+    [...guaranteedOneTimeObligations.map((obligation) => obligation.amount), ...guaranteedMandatoryFees.map((item) => item.amount)],
+    "maximum known eligible one-time obligation or mandatory fee amount",
+    "no eligible one-time obligation or mandatory fee has a fully known amount",
   );
+
+  // `totalsByCurrency` represents normal-path *known financial exposure*, a
+  // broader concept than guaranteed cost: fees whose mandatory status is
+  // simply unstated (`mandatory: null`, the conservative default in
+  // `extractFromFees`) are still real, known amounts tied to the contract and
+  // must not be dropped merely for lacking explicit "mandatory" wording —
+  // only an explicit optional/conditional signal excludes them here (see
+  // `isNormalPathExposureComponent`). Recurring obligations contribute via
+  // the single, pre-computed `totalScheduledRecurring` for the currency it
+  // resolved to; any *other* currency among eligible recurring obligations
+  // (only possible when the contract mixes currencies, so no single
+  // recurring total could be resolved) falls back to its own raw amounts so
+  // that currency is never silently dropped.
+  const { eligible: exposureEligibleFees } = selectEligibleMandatoryFeeItems(feeItems, isNormalPathExposureComponent);
+  const eligibleRecurringObligations = obligations.filter(
+    (obligation) => isGuaranteed(obligation.mandatory, obligation.conditional) && obligation.frequency !== "one_time",
+  );
+  const recurringFallbackAmounts = eligibleRecurringObligations
+    .filter(
+      (obligation) =>
+        totalScheduledRecurring.status !== "known" || obligation.amount.currency !== totalScheduledRecurring.currency,
+    )
+    .map((obligation) => obligation.amount);
+
+  const totalsByCurrency = computeTotalsByCurrency([
+    ...guaranteedOneTimeObligations.map((obligation) => obligation.amount),
+    ...exposureEligibleFees.map((item) => item.amount),
+    totalScheduledRecurring,
+    ...recurringFallbackAmounts,
+  ]);
 
   return {
     result: {
@@ -81,7 +121,7 @@ export function calculateExposure(
       contingentExposure,
       maximumSinglePayment,
       unquantifiedContingentExposure,
-      totalsByCurrency: computeTotalsByCurrency(allKnownAmounts),
+      totalsByCurrency,
     },
     metadata: emptyMetadata(),
   };

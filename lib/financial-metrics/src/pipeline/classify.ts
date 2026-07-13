@@ -1,5 +1,6 @@
 import type { FeeType, ObligationType, PaymentFrequency, PenaltyType } from "../enums";
 import { containsAnyKeyword } from "../normalize/text";
+import type { CandidateContext } from "./semantics";
 
 /**
  * Bilingual (English/Arabic) keyword heuristics used to classify the free
@@ -10,7 +11,13 @@ import { containsAnyKeyword } from "../normalize/text";
  */
 
 const OBLIGATION_TYPE_KEYWORDS: ReadonlyArray<{ type: ObligationType; keywords: readonly string[] }> = [
-  { type: "principal", keywords: ["principal", "financed amount", "loan amount", "amount financed", "أصل المبلغ", "المبلغ الممول", "مبلغ التمويل"] },
+  {
+    type: "principal",
+    keywords: [
+      "principal", "financed amount", "loan amount", "amount financed", "opening financed balance", "opening balance",
+      "أصل المبلغ", "المبلغ الممول", "مبلغ التمويل", "الرصيد الممول الافتتاحي", "الرصيد الافتتاحي",
+    ],
+  },
   { type: "balloon_payment", keywords: ["balloon", "final payment", "residual value", "دفعة ختامية", "القيمة المتبقية"] },
   { type: "deposit", keywords: ["deposit", "security deposit", "تأمين", "وديعة", "عربون"] },
   { type: "upfront_payment", keywords: ["down payment", "downpayment", "upfront", "initial payment", "دفعة أولى", "دفعة مقدمة"] },
@@ -91,6 +98,19 @@ export function classifyPenaltyTypeText(...texts: Array<string | null | undefine
 const MANDATORY_KEYWORDS = ["mandatory", "required", "must pay", "إلزامي", "واجب"];
 const OPTIONAL_KEYWORDS = ["optional", "voluntary", "if elected", "اختياري"];
 
+/**
+ * A plain declarative statement that a fee/amount *is* paid (no "if you
+ * choose", no optional/conditional trigger) — e.g. "an administrative fee
+ * of 1,000 SAR is paid after contract execution" — never says "mandatory"
+ * literally, but leaves no room for the customer to avoid it. Only used as
+ * a fallback signal, and only when no conditional trigger wording is also
+ * present (see `inferMandatoryFromText`).
+ */
+const EXPLICIT_PAYMENT_KEYWORDS = [
+  "is paid", "shall be paid", "will be paid", "paid after", "must be paid", "is payable", "is charged",
+  "يُدفع", "تُدفع", "يتم دفعه", "تُسدد", "تدفع", "يستوفى", "تُستوفى",
+];
+
 /** Returns `true`/`false` only when the text explicitly signals it; `null` when genuinely unstated. */
 export function inferMandatoryFromText(...texts: Array<string | null | undefined>): boolean | null {
   const combined = texts.filter((text): text is string => typeof text === "string").join(" ");
@@ -99,6 +119,9 @@ export function inferMandatoryFromText(...texts: Array<string | null | undefined
   }
   if (containsAnyKeyword(combined, OPTIONAL_KEYWORDS)) {
     return false;
+  }
+  if (containsAnyKeyword(combined, EXPLICIT_PAYMENT_KEYWORDS) && !containsAnyKeyword(combined, CONDITIONAL_KEYWORDS)) {
+    return true;
   }
   return null;
 }
@@ -155,4 +178,59 @@ export function looksLikeDurationUnitText(unit: string | null | undefined): bool
     return false;
   }
   return containsAnyKeyword(unit, DURATION_UNIT_KEYWORDS);
+}
+
+const ASSET_VALUE_KEYWORDS = [
+  "vehicle value", "asset value", "vehicle price", "purchase price", "asset price",
+  "قيمة المركبة", "سعر المركبة", "قيمة العقار", "سعر الشراء", "قيمة الأصل",
+];
+
+/** True when the text describes a reference/collateral value (e.g. a vehicle's or property's value) — never itself a payment the customer owes. */
+export function isAssetValueText(...texts: Array<string | null | undefined>): boolean {
+  const combined = texts.filter((text): text is string => typeof text === "string").join(" ");
+  return containsAnyKeyword(combined, ASSET_VALUE_KEYWORDS);
+}
+
+const EARLY_SETTLEMENT_BALANCE_KEYWORDS = [
+  "remaining balance", "outstanding balance", "remaining payments", "الرصيد المتبقي", "عدد الدفعات المتبقية",
+];
+const EARLY_SETTLEMENT_PAYMENT_KEYWORDS = [
+  "early settlement", "early repayment", "early-settlement total", "settlement amount", "settlement total",
+  "term cost", "three-month", "السداد المبكر", "التسوية المبكرة", "إجمالي التسوية المبكرة", "كلفة الأجل",
+];
+const DEFAULT_SCENARIO_KEYWORDS = ["upon default", "in the event of default", "عند التعثر", "في حال الإخلال"];
+const CANCELLATION_SCENARIO_KEYWORDS = ["upon cancellation", "if cancelled", "عند الإلغاء", "في حال الإلغاء"];
+const INSURANCE_CLAIM_KEYWORDS = ["insurance claim", "in the event of a claim", "مطالبة تأمين", "عند المطالبة"];
+
+/**
+ * Detects that a candidate belongs to a non-normal-path scenario (early
+ * settlement, default, cancellation, an insurance claim) purely from its
+ * own label/description/condition text — Milestone 4 has no structural
+ * grouping to signal this, so text is the only available signal. Returns
+ * `null` (normal contract path) when nothing matches.
+ */
+export function classifyScenarioContext(...texts: Array<string | null | undefined>): CandidateContext | null {
+  const combined = texts.filter((text): text is string => typeof text === "string").join(" ");
+  if (
+    containsAnyKeyword(combined, EARLY_SETTLEMENT_BALANCE_KEYWORDS) ||
+    containsAnyKeyword(combined, EARLY_SETTLEMENT_PAYMENT_KEYWORDS)
+  ) {
+    return "early_settlement_scenario";
+  }
+  if (containsAnyKeyword(combined, DEFAULT_SCENARIO_KEYWORDS)) {
+    return "default_scenario";
+  }
+  if (containsAnyKeyword(combined, CANCELLATION_SCENARIO_KEYWORDS)) {
+    return "cancellation_scenario";
+  }
+  if (containsAnyKeyword(combined, INSURANCE_CLAIM_KEYWORDS)) {
+    return "insurance_claim_scenario";
+  }
+  return null;
+}
+
+/** Within an early-settlement scenario, distinguishes a *balance* (what's still owed) from a *payment/cost* (an amount due as part of settling). */
+export function isScenarioBalanceText(...texts: Array<string | null | undefined>): boolean {
+  const combined = texts.filter((text): text is string => typeof text === "string").join(" ");
+  return containsAnyKeyword(combined, EARLY_SETTLEMENT_BALANCE_KEYWORDS);
 }

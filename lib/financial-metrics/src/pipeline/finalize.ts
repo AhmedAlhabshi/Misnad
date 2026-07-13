@@ -6,6 +6,7 @@ import type { PenaltyItem } from "../penalty";
 import type { PercentageMetric } from "../percentageMetric";
 import { knownMoney, knownPercentage, unavailableMoney, unavailablePercentage } from "../utils/metricFactories";
 import type { Candidate } from "./candidates";
+import { isEligiblePaymentObligation } from "./eligibility";
 
 /**
  * Converts a resolved candidate's amount into a `MoneyMetric`. An amount
@@ -39,11 +40,39 @@ function bySourceField(a: Candidate, b: Candidate): number {
   return a.sourceField.localeCompare(b.sourceField);
 }
 
+/**
+ * A candidate whose `semanticRole`/`context` disqualifies it (asset value,
+ * principal, a scenario amount, a reference-only figure, ...) can never
+ * become a `PaymentObligation` — it is recorded as an excluded value instead
+ * of silently vanishing. Shared by `buildPaymentObligations` and
+ * `buildObligationRefundabilityMap` so both use the exact same filtered,
+ * sorted candidate list and therefore the exact same `obligation-N` ids.
+ */
+function selectEligibleObligationCandidates(
+  candidates: readonly Candidate[],
+  metadata: CalculatorMetadata,
+): Candidate[] {
+  const sorted = [...candidates].sort(bySourceField);
+  const eligible: Candidate[] = [];
+  for (const candidate of sorted) {
+    if (isEligiblePaymentObligation(candidate.semanticRole, candidate.context)) {
+      eligible.push(candidate);
+      continue;
+    }
+    metadata.excludedValues.push({
+      value: candidate.amountValue,
+      reasonCode: `not_a_payment_obligation:${candidate.semanticRole}:${candidate.context}`,
+      sourceField: candidate.sourceField,
+    });
+  }
+  return eligible;
+}
+
 export function buildPaymentObligations(
   candidates: readonly Candidate[],
   metadata: CalculatorMetadata,
 ): PaymentObligation[] {
-  return [...candidates].sort(bySourceField).map((candidate, index) => ({
+  return selectEligibleObligationCandidates(candidates, metadata).map((candidate, index) => ({
     id: `obligation-${index}`,
     label: candidate.label,
     type: candidate.obligationType ?? "unknown",
@@ -62,12 +91,15 @@ export function buildPaymentObligations(
  * `PaymentObligation` (a Milestone 5.5 public schema type) has no
  * `refundable` field — only the internal `Candidate` does. This map lets
  * calculators look up a built obligation's source candidate's refundable
- * signal by id (using the exact same sort/id-assignment as
- * `buildPaymentObligations`) without adding a field to the public schema.
+ * signal by id (using the exact same eligibility filter, sort, and
+ * id-assignment as `buildPaymentObligations`) without adding a field to the
+ * public schema. Uses a throwaway metadata sink so the same exclusions are
+ * not double-reported alongside `buildPaymentObligations`'s own call.
  */
 export function buildObligationRefundabilityMap(candidates: readonly Candidate[]): ReadonlyMap<string, boolean | null> {
   const map = new Map<string, boolean | null>();
-  [...candidates].sort(bySourceField).forEach((candidate, index) => {
+  const throwawayMetadata: CalculatorMetadata = { formulas: [], unavailable: [], warnings: [], excludedValues: [] };
+  selectEligibleObligationCandidates(candidates, throwawayMetadata).forEach((candidate, index) => {
     map.set(`obligation-${index}`, candidate.refundable);
   });
   return map;

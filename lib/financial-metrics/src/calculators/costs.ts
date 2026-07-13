@@ -6,14 +6,10 @@ import type { PaymentObligation } from "../paymentObligation";
 import type { PenaltyCollection, PenaltyItem } from "../penalty";
 import type { RecurringCommitment } from "../recurringCommitment";
 import type { TotalCost } from "../totalCost";
-import { isDepositLikeText } from "../pipeline/classify";
+import { selectEligibleMandatoryFeeItems, selectEligibleOneTimeObligations } from "../pipeline/eligibility";
 import { knownMoney, maxKnownMoneyMetric, sumKnownMoneyMetrics, unavailableMoney } from "../utils/metricFactories";
 import { round2 } from "../utils/rounding";
 import { emptyMetadata, mergeMetadata, type CalculatorMetadata } from "./metadata";
-
-function isGuaranteed(mandatory: boolean | null, conditional: boolean | null): boolean {
-  return mandatory === true && conditional !== true;
-}
 
 const RECURRING_FREQUENCIES = new Set(["daily", "weekly", "monthly", "quarterly", "semi_annual", "annual"]);
 
@@ -37,35 +33,15 @@ export function buildFeeCollection(items: readonly FeeItem[]): { result: FeeColl
     };
   }
 
-  // A deposit's refundability is a genuinely open question (unlike an
-  // ordinary fee, which is conventionally non-refundable): explicitly
-  // refundable is excluded (it is not a real cost), explicitly
-  // non-refundable is included, and — critically — *unknown* refundability
-  // is excluded from guaranteed cost too, but flagged as an excluded value
-  // rather than silently assumed either way.
-  const mandatoryAmounts: MoneyMetric[] = [];
-  for (const item of items) {
-    if (!isGuaranteed(item.mandatory, item.conditional)) {
-      continue;
-    }
-    if (isDepositLikeText(item.label)) {
-      if (item.refundable === true) {
-        continue;
-      }
-      if (item.refundable === null) {
-        metadata.excludedValues.push({
-          value: item.amount.value,
-          reasonCode: "deposit_refundability_unresolved",
-          sourceField: item.sourceFields[0] ?? item.id,
-        });
-        continue;
-      }
-      // item.refundable === false: confirmed non-refundable, falls through.
-    } else if (item.refundable === true) {
-      continue;
-    }
-    mandatoryAmounts.push(item.amount);
+  const { eligible: eligibleMandatoryFees, unresolvedDeposits } = selectEligibleMandatoryFeeItems(items);
+  for (const item of unresolvedDeposits) {
+    metadata.excludedValues.push({
+      value: item.amount.value,
+      reasonCode: "deposit_refundability_unresolved",
+      sourceField: item.sourceFields[0] ?? item.id,
+    });
   }
+  const mandatoryAmounts: MoneyMetric[] = eligibleMandatoryFees.map((item) => item.amount);
 
   const upfrontAmounts = items.filter((item) => item.frequency === "one_time").map((item) => item.amount);
   const recurringAmounts = items
@@ -131,7 +107,7 @@ export function buildPenaltyCollection(items: readonly PenaltyItem[]): { result:
 }
 
 /** Priority: explicit installment amount × explicit count (not yet populated by Milestone 4) → recurring monthly equivalent × known duration in months → unavailable. */
-function calculateTotalScheduledRecurring(
+export function calculateTotalScheduledRecurring(
   recurringCommitment: RecurringCommitment,
   contractDuration: ContractDuration,
 ): { result: MoneyMetric; metadata: CalculatorMetadata } {
@@ -211,34 +187,18 @@ export function calculateTotalCost(
 ): { result: TotalCost; metadata: CalculatorMetadata } {
   const metadata = emptyMetadata();
 
-  // A deposit's refundability is a genuinely open question: explicitly
-  // refundable is excluded (not a real cost), explicitly non-refundable is
-  // included, and unresolved is excluded too but flagged — never silently
-  // assumed either way. Non-deposit one-time obligations (down payments,
-  // balloon payments) are unaffected; refundability was never a relevant
-  // question for them.
-  const oneTimeAmounts: MoneyMetric[] = [];
-  for (const obligation of oneTimeGuaranteedObligations) {
-    if (!isGuaranteed(obligation.mandatory, obligation.conditional) || obligation.frequency !== "one_time") {
-      continue;
-    }
-    if (obligation.type === "deposit") {
-      const refundable = obligationRefundability.get(obligation.id) ?? null;
-      if (refundable === true) {
-        continue;
-      }
-      if (refundable === null) {
-        metadata.excludedValues.push({
-          value: obligation.amount.value,
-          reasonCode: "deposit_refundability_unresolved",
-          sourceField: obligation.sourceFields[0] ?? obligation.id,
-        });
-        continue;
-      }
-      // refundable === false: confirmed non-refundable, falls through.
-    }
-    oneTimeAmounts.push(obligation.amount);
+  const { eligible: eligibleOneTimeObligations, unresolvedDeposits } = selectEligibleOneTimeObligations(
+    oneTimeGuaranteedObligations,
+    obligationRefundability,
+  );
+  for (const obligation of unresolvedDeposits) {
+    metadata.excludedValues.push({
+      value: obligation.amount.value,
+      reasonCode: "deposit_refundability_unresolved",
+      sourceField: obligation.sourceFields[0] ?? obligation.id,
+    });
   }
+  const oneTimeAmounts: MoneyMetric[] = eligibleOneTimeObligations.map((obligation) => obligation.amount);
   const oneTimeTotal = sumKnownMoneyMetrics(
     oneTimeAmounts,
     "sum of mandatory one-time obligations (confirmed non-refundable, for deposits)",

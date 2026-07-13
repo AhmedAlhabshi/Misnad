@@ -91,11 +91,14 @@ function penaltyCollection(items: PenaltyItem[], overrides: Partial<PenaltyColle
   };
 }
 
+const noObligationRefundability = new Map<string, boolean | null>();
+const noScheduledRecurring = unavailableMoney("n/a");
+
 export function run(): void {
   // Guaranteed exposure = calculatedCoreObligations, passed through directly.
   {
     const coreObligations = knownMoney(18500, "SAR", "test");
-    const { result } = calculateExposure([], [], feeCollection([]), penaltyCollection([]), emptyRecurringCommitment, coreObligations, unavailableMoney("n/a"));
+    const { result } = calculateExposure([], [], feeCollection([]), penaltyCollection([]), emptyRecurringCommitment, coreObligations, unavailableMoney("n/a"), noObligationRefundability, noScheduledRecurring);
     assert.equal(result.totalKnownExposure.value, 18500);
   }
 
@@ -103,7 +106,7 @@ export function run(): void {
   {
     const downPayment = obligation({ type: "upfront_payment", frequency: "one_time", amount: knownMoney(5000, "SAR", "test") });
     const fees = feeCollection([feeItem({ frequency: "one_time" })], { upfrontFees: knownMoney(100, "SAR", "test") });
-    const { result } = calculateExposure([downPayment], fees.items, fees, penaltyCollection([]), emptyRecurringCommitment, unavailableMoney("n/a"), unavailableMoney("n/a"));
+    const { result } = calculateExposure([downPayment], fees.items, fees, penaltyCollection([]), emptyRecurringCommitment, unavailableMoney("n/a"), unavailableMoney("n/a"), noObligationRefundability, noScheduledRecurring);
     assert.equal(result.upfrontExposure.value, 5100);
   }
 
@@ -112,27 +115,27 @@ export function run(): void {
     const fees = feeCollection([], { conditionalFees: knownMoney(30, "SAR", "test") });
     const penalties = penaltyCollection([], { totalKnownPenalties: knownMoney(100, "SAR", "test") });
     const deductible = knownMoney(500, "SAR", "test");
-    const { result } = calculateExposure([], [], fees, penalties, emptyRecurringCommitment, unavailableMoney("n/a"), deductible);
+    const { result } = calculateExposure([], [], fees, penalties, emptyRecurringCommitment, unavailableMoney("n/a"), deductible, noObligationRefundability, noScheduledRecurring);
     assert.equal(result.contingentExposure.value, 630);
   }
 
   // Unresolved (percentage-only) conditional exposure is flagged, not fabricated.
   {
     const unresolvedFee = feeItem({ conditional: true, amount: unavailableMoney("percentage-based") });
-    const { result } = calculateExposure([], [unresolvedFee], feeCollection([unresolvedFee]), penaltyCollection([]), emptyRecurringCommitment, unavailableMoney("n/a"), unavailableMoney("n/a"));
+    const { result } = calculateExposure([], [unresolvedFee], feeCollection([unresolvedFee]), penaltyCollection([]), emptyRecurringCommitment, unavailableMoney("n/a"), unavailableMoney("n/a"), noObligationRefundability, noScheduledRecurring);
     assert.equal(result.unquantifiedContingentExposure, true);
   }
 
   // Credit limit must never appear as exposure or a monthly commitment (the calculator is never even given one — verified structurally).
   {
-    const { result } = calculateExposure([], [], feeCollection([]), penaltyCollection([]), emptyRecurringCommitment, unavailableMoney("n/a"), unavailableMoney("n/a"));
+    const { result } = calculateExposure([], [], feeCollection([]), penaltyCollection([]), emptyRecurringCommitment, unavailableMoney("n/a"), unavailableMoney("n/a"), noObligationRefundability, noScheduledRecurring);
     assert.equal(result.monthlyExposure.value, 1000, "monthlyExposure must reflect only the recurring commitment, never a credit limit");
   }
 
   // Insurance deductible is conditional exposure — it must not be reported as monthlyExposure or upfrontExposure.
   {
     const deductible = knownMoney(750, "SAR", "test");
-    const { result } = calculateExposure([], [], feeCollection([]), penaltyCollection([]), emptyRecurringCommitment, unavailableMoney("n/a"), deductible);
+    const { result } = calculateExposure([], [], feeCollection([]), penaltyCollection([]), emptyRecurringCommitment, unavailableMoney("n/a"), deductible, noObligationRefundability, noScheduledRecurring);
     assert.equal(result.contingentExposure.value, 750);
     assert.notEqual(result.monthlyExposure.value, 750);
     assert.notEqual(result.upfrontExposure.value, 750);
@@ -141,26 +144,45 @@ export function run(): void {
   // Final/balloon payment counted in maximumSinglePayment.
   {
     const balloon = obligation({ id: "balloon", type: "balloon_payment", frequency: "one_time", amount: knownMoney(20000, "SAR", "test") });
-    const { result } = calculateExposure([balloon], [], feeCollection([]), penaltyCollection([]), emptyRecurringCommitment, unavailableMoney("n/a"), unavailableMoney("n/a"));
+    const { result } = calculateExposure([balloon], [], feeCollection([]), penaltyCollection([]), emptyRecurringCommitment, unavailableMoney("n/a"), unavailableMoney("n/a"), noObligationRefundability, noScheduledRecurring);
     assert.equal(result.maximumSinglePayment.value, 20000);
   }
 
   // Refundable deposit treatment: included in upfront exposure (cash needed now) even though it is not "non-refundable cost".
   {
     const deposit = obligation({ id: "dep", type: "deposit", frequency: "one_time", mandatory: true, amount: knownMoney(2000, "SAR", "test") });
-    const { result } = calculateExposure([deposit], [], feeCollection([]), penaltyCollection([]), emptyRecurringCommitment, unavailableMoney("n/a"), unavailableMoney("n/a"));
+    const { result } = calculateExposure([deposit], [], feeCollection([]), penaltyCollection([]), emptyRecurringCommitment, unavailableMoney("n/a"), unavailableMoney("n/a"), noObligationRefundability, noScheduledRecurring);
     assert.equal(result.upfrontExposure.value, 2000);
   }
 
-  // Multiple currencies must be represented separately in totalsByCurrency, never merged.
+  // Deposit with unresolved refundability must never enter maximumSinglePayment/totalsByCurrency, even though (per the prior test) it does count toward upfrontExposure.
   {
-    const sarObligation = obligation({ id: "sar", amount: knownMoney(1000, "SAR", "test") });
+    const deposit = obligation({ id: "dep-unresolved", type: "deposit", frequency: "one_time", mandatory: true, amount: knownMoney(9000, "SAR", "test") });
+    const { result } = calculateExposure([deposit], [], feeCollection([]), penaltyCollection([]), emptyRecurringCommitment, unavailableMoney("n/a"), unavailableMoney("n/a"), noObligationRefundability, noScheduledRecurring);
+    assert.notEqual(result.maximumSinglePayment.value, 9000, "a deposit with unresolved refundability must not become the guaranteed maximum single payment");
+    assert.equal(result.totalsByCurrency.length, 0, "a deposit with unresolved refundability must not appear in totalsByCurrency");
+  }
+
+  // Multiple currencies must be represented separately in totalsByCurrency, never merged.
+  // The SAR side is a mandatory one-time obligation (not recurring) so it is
+  // directly eligible without depending on a separately-supplied scheduled
+  // recurring total.
+  {
+    const sarObligation = obligation({ id: "sar", frequency: "one_time", amount: knownMoney(1000, "SAR", "test") });
     const usdFee = feeItem({ id: "usd", amount: knownMoney(50, "USD", "test") });
-    const { result } = calculateExposure([sarObligation], [usdFee], feeCollection([usdFee]), penaltyCollection([]), emptyRecurringCommitment, unavailableMoney("n/a"), unavailableMoney("n/a"));
+    const { result } = calculateExposure([sarObligation], [usdFee], feeCollection([usdFee]), penaltyCollection([]), emptyRecurringCommitment, unavailableMoney("n/a"), unavailableMoney("n/a"), noObligationRefundability, noScheduledRecurring);
     const currencies = result.totalsByCurrency.map((entry) => entry.currency);
     assert.ok(currencies.includes("SAR"));
     assert.ok(currencies.includes("USD"));
     assert.equal(result.totalsByCurrency.length, 2);
+  }
+
+  // The scheduled recurring total (computed once, shared with `costs.ts`) contributes its own currency bucket to totalsByCurrency.
+  {
+    const recurring = knownMoney(138000, "SAR", "monthlyEquivalent × contractDuration.months");
+    const { result } = calculateExposure([], [], feeCollection([]), penaltyCollection([]), emptyRecurringCommitment, unavailableMoney("n/a"), unavailableMoney("n/a"), noObligationRefundability, recurring);
+    const sarEntry = result.totalsByCurrency.find((entry) => entry.currency === "SAR");
+    assert.equal(sarEntry?.value, 138000);
   }
 
   console.log("PASS calculators.exposure.test.ts");

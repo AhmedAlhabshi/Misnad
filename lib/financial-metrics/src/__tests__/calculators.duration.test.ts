@@ -24,6 +24,8 @@ function obligationCandidate(overrides: Partial<Candidate>): Candidate {
     sourceField: "typeDetails.monthlyInstallment",
     evidence: "Monthly installment",
     confidence: "high",
+    semanticRole: "unknown",
+    context: "normal_contract_path",
     ...overrides,
   };
 }

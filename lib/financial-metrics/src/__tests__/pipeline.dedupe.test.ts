@@ -22,6 +22,8 @@ function candidate(overrides: Partial<Candidate>): Candidate {
     sourceField: "financialObligations[0]",
     evidence: "Item",
     confidence: "medium",
+    semanticRole: "unknown",
+    context: "normal_contract_path",
     ...overrides,
   };
 }

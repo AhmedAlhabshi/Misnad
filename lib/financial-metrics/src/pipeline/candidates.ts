@@ -6,11 +6,60 @@ import {
   classifyFeeTypeText,
   classifyObligationTypeText,
   classifyPenaltyTypeText,
+  classifyScenarioContext,
   inferConditionalFromText,
   inferMandatoryFromText,
   inferRefundableFromText,
+  isAssetValueText,
+  isScenarioBalanceText,
   isStatedTotalCostText,
 } from "./classify";
+import type { CandidateContext, CandidateSemanticRole } from "./semantics";
+
+/** Obligation types that are structurally one-time by their very nature — used to keep frequency classification consistent across sources (see `withOneTimeFrequencyDefault`). */
+const INHERENTLY_ONE_TIME_OBLIGATION_TYPES = new Set<ObligationType>([
+  "upfront_payment",
+  "balloon_payment",
+  "deposit",
+  "one_time_payment",
+]);
+
+/**
+ * Stage 1 of frequency resolution: every available *text* signal (a
+ * dedicated frequency field first, then the description/label itself,
+ * since Milestone 4's free-text `frequency` field is often left empty even
+ * when the description clearly states a cadence, e.g. "Monthly
+ * installment"). Computed before obligation-type classification, since
+ * `classifyObligationTypeText` itself takes the resolved frequency as one
+ * of its inputs.
+ */
+function resolveTextFrequency(
+  explicitFrequencyText: string | null | undefined,
+  descriptionText: string | null | undefined,
+): PaymentFrequency | null {
+  return classifyFrequencyText(explicitFrequencyText) ?? classifyFrequencyText(descriptionText);
+}
+
+/**
+ * Stage 2: once the obligation type is known, a still-unresolved frequency
+ * defaults to `"one_time"` for obligation types that are inherently
+ * one-time (a down payment, balloon payment, or deposit is one-time by its
+ * very nature, regardless of whether the source text happened to restate
+ * that). This keeps a `typeDetails`-sourced candidate (always has an
+ * explicit hardcoded frequency) and a generic `financialObligations[]`/
+ * `extractedNumbers[]` candidate for the *same* concept from silently
+ * ending up with mismatched frequencies purely because the free-text
+ * source never restated it — which would otherwise defeat deduplication.
+ */
+function withOneTimeFrequencyFallback(
+  frequency: PaymentFrequency | null,
+  obligationType: ObligationType,
+): PaymentFrequency | null {
+  if (frequency !== null) {
+    return frequency;
+  }
+  return INHERENTLY_ONE_TIME_OBLIGATION_TYPES.has(obligationType) ? "one_time" : null;
+}
 
 export type CandidateTargetKind = "obligation" | "fee" | "penalty" | "special";
 
@@ -42,6 +91,15 @@ export interface Candidate {
   obligationType?: ObligationType;
   feeType?: FeeType;
   penaltyType?: PenaltyType;
+  /**
+   * What this candidate actually *is*, independent of which Milestone 4
+   * array it came from — computed once, after extraction, by
+   * `assignSemantics` (see below). Determines whether it can ever become a
+   * `PaymentObligation` and whether it counts toward normal-path exposure.
+   */
+  semanticRole: CandidateSemanticRole;
+  /** Which "path" through the contract this candidate belongs to — only `normal_contract_path` amounts feed guaranteed/known cost, exposure, or `maximumSinglePayment`. */
+  context: CandidateContext;
   label: string;
   amountValue: number | null;
   currency: string | null;
@@ -66,6 +124,8 @@ function baseCandidate(sourceKind: CandidateSourceKind, sourceField: string): Om
   "targetKind" | "label" | "amountValue" | "currency"
 > {
   return {
+    semanticRole: "unknown",
+    context: "normal_contract_path",
     percentageValue: null,
     frequency: null,
     numberOfPayments: null,
@@ -107,8 +167,9 @@ function fromTypeDetailsAmount(
 function extractFromFinancialObligations(input: ContractUnderstanding): Candidate[] {
   return input.financialObligations.map((obligation, index) => {
     const amountValue = sanitizeNumericAmount(obligation.amount);
-    const frequency = classifyFrequencyText(obligation.frequency);
-    const obligationType = classifyObligationTypeText(frequency, obligation.description);
+    const textFrequency = resolveTextFrequency(obligation.frequency, obligation.description);
+    const obligationType = classifyObligationTypeText(textFrequency, obligation.description);
+    const frequency = withOneTimeFrequencyFallback(textFrequency, obligationType);
     const explicitMandatory = inferMandatoryFromText(obligation.description);
     const conditional = inferConditionalFromText(obligation.description);
     // A listed financial obligation is presumed part of the normal course of
@@ -181,11 +242,13 @@ function extractFromExtractedNumbers(input: ContractUnderstanding): Candidate[] 
     if (amountValue === null) {
       return;
     }
-    const frequency = classifyFrequencyText(extracted.label);
+    const textFrequency = classifyFrequencyText(extracted.label);
+    const obligationType = classifyObligationTypeText(textFrequency, extracted.label);
+    const frequency = withOneTimeFrequencyFallback(textFrequency, obligationType);
     candidates.push({
       ...baseCandidate("extracted_number", `extractedNumbers[${index}]`),
       targetKind: "obligation",
-      obligationType: classifyObligationTypeText(frequency, extracted.label),
+      obligationType,
       label: extracted.label,
       amountValue,
       currency,
@@ -391,15 +454,92 @@ function extractFromTypeDetails(input: ContractUnderstanding): Candidate[] {
   return candidates;
 }
 
+const SPECIAL_KEY_TO_ROLE: Record<SpecialValueKey, CandidateSemanticRole> = {
+  principal: "principal",
+  creditLimit: "credit_limit",
+  outstandingBalance: "reference_value",
+  monthlyIncome: "income",
+  statedTotalCost: "reference_value",
+  insuranceDeductible: "conditional_fee",
+};
+
+/**
+ * Derives what a candidate actually *is* (see `CandidateSemanticRole`).
+ * `specialKey`/fee/penalty candidates already carry a reliable structural
+ * signal; a generic `targetKind: "obligation"` candidate (from
+ * `financialObligations[]`/`extractedNumbers[]`/`typeDetails`) is the one
+ * case that can describe a concept Milestone 4 has no dedicated field for
+ * (an asset's value, a restated principal, an early-settlement scenario
+ * amount) — text is the only available signal for those.
+ */
+function deriveSemanticRole(candidate: Candidate): CandidateSemanticRole {
+  if (candidate.specialKey) {
+    return SPECIAL_KEY_TO_ROLE[candidate.specialKey];
+  }
+
+  if (candidate.targetKind === "fee") {
+    return candidate.mandatory === true && candidate.conditional !== true ? "mandatory_fee" : "conditional_fee";
+  }
+  if (candidate.targetKind === "penalty") {
+    return "penalty";
+  }
+
+  if (isAssetValueText(candidate.label, candidate.evidence)) {
+    return "asset_value";
+  }
+  const scenario = classifyScenarioContext(candidate.label, candidate.evidence, candidate.trigger);
+  if (scenario !== null) {
+    return isScenarioBalanceText(candidate.label, candidate.evidence) ? "scenario_balance" : "scenario_payment";
+  }
+
+  switch (candidate.obligationType) {
+    case "principal":
+      return "principal";
+    case "upfront_payment":
+    case "one_time_payment":
+      return "upfront_payment";
+    case "recurring_payment":
+    case "balloon_payment":
+    case "insurance":
+      return "scheduled_payment";
+    case "deposit":
+      return "deposit";
+    case "tax":
+      return "mandatory_fee";
+    case "conditional_payment":
+      return "conditional_fee";
+    default:
+      return "unknown";
+  }
+}
+
+/** A candidate's context follows scenario-keyword detection first, then falls back to `reference_only` for asset values / reference figures, else the normal contract path. */
+function deriveContext(candidate: Candidate, semanticRole: CandidateSemanticRole): CandidateContext {
+  const scenario = classifyScenarioContext(candidate.label, candidate.evidence, candidate.trigger);
+  if (scenario !== null) {
+    return scenario;
+  }
+  if (semanticRole === "asset_value" || semanticRole === "reference_value") {
+    return "reference_only";
+  }
+  return "normal_contract_path";
+}
+
+function assignSemantics(candidate: Candidate): Candidate {
+  const semanticRole = deriveSemanticRole(candidate);
+  const context = deriveContext(candidate, semanticRole);
+  return { ...candidate, semanticRole, context };
+}
+
 export interface ExtractedCandidates {
   candidates: Candidate[];
 }
 
 /**
- * Extracts every financial candidate from a validated `ContractUnderstanding`.
- * Purely a data-gathering step — no classification refinement beyond what's
- * needed to bucket a candidate (`targetKind`), no deduplication, and no
- * conflict resolution happen here yet.
+ * Extracts every financial candidate from a validated `ContractUnderstanding`,
+ * then assigns each one its internal semantic role/context (see
+ * `assignSemantics`). Purely a data-gathering + classification step — no
+ * deduplication and no conflict resolution happen here yet.
  */
 export function extractCandidates(input: ContractUnderstanding): ExtractedCandidates {
   const candidates: Candidate[] = [
@@ -409,7 +549,7 @@ export function extractCandidates(input: ContractUnderstanding): ExtractedCandid
     ...extractFromPenalties(input),
     ...extractFromExtractedNumbers(input),
     ...extractStatedTotalCostCandidates(input),
-  ];
+  ].map(assignSemantics);
 
   return { candidates };
 }

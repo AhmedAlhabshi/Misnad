@@ -28,6 +28,8 @@ function candidate(overrides: Partial<Candidate>): Candidate {
     evidence: "Monthly installment",
     confidence: "medium",
     obligationType: "recurring_payment",
+    semanticRole: "unknown",
+    context: "normal_contract_path",
     ...overrides,
   };
 }

@@ -1,6 +1,6 @@
 import { contractUnderstandingSchema, type ContractUnderstanding } from "@workspace/contract-schema";
 import { calculateRecurringCommitment, monthlyEquivalentFactor } from "./calculators/commitments";
-import { buildFeeCollection, buildPenaltyCollection, calculateTotalCost } from "./calculators/costs";
+import { buildFeeCollection, buildPenaltyCollection, calculateTotalCost, calculateTotalScheduledRecurring } from "./calculators/costs";
 import { calculateContractDuration } from "./calculators/duration";
 import { calculateExposure } from "./calculators/exposure";
 import { emptyMetadata, mergeMetadata } from "./calculators/metadata";
@@ -159,6 +159,12 @@ export function calculateFinancialMetrics(
     statedTotalCost,
   );
 
+  // Computed once here (via the same shared function `calculateTotalCost`
+  // uses internally) so `exposure.ts` never re-derives the scheduled
+  // recurring total with its own logic — see `calculators/eligibility`-based
+  // exposure computation for why this must match `calculatedCoreObligations`.
+  const { result: totalScheduledRecurring } = calculateTotalScheduledRecurring(recurringCommitment, contractDuration);
+
   const { result: exposure, metadata: exposureMetadata } = calculateExposure(
     paymentObligations,
     feeItems,
@@ -167,6 +173,8 @@ export function calculateFinancialMetrics(
     recurringCommitment,
     totalCost.calculatedCoreObligations,
     insuranceDeductible,
+    obligationRefundability,
+    totalScheduledRecurring,
   );
 
   const { result: ratios, metadata: ratioMetadata } = calculateRatios(
