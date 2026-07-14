@@ -15,7 +15,7 @@ import {
   invalidContractTypeError,
   schemaValidationFailedError,
 } from "./errors";
-import { buildAnalysisPrompt, buildCorrectionPrompt, SYSTEM_INSTRUCTIONS } from "./promptBuilder";
+import { buildAnalysisPrompt, buildCorrectionPrompt, SYSTEM_INSTRUCTIONS, type DeterministicRecoveryNote } from "./promptBuilder";
 import { parseJsonResponse, validateContractUnderstanding } from "./validate";
 import type { ContractAnalysisProvider, ProviderResponseDiagnostics } from "./providers/types";
 import { geminiContractAnalysisProvider } from "./providers/geminiProvider";
@@ -27,6 +27,14 @@ export interface AnalyzeContractOptions {
   provider?: ContractAnalysisProvider;
   /** Used only when the primary provider fails with RATE_LIMITED. */
   fallbackProvider?: ContractAnalysisProvider;
+  /**
+   * Optional deterministic (non-AI) financial-value recovery results from
+   * document-ocr's OCR-corruption recovery pass — see
+   * `promptBuilder.ts`'s `buildRecoveryNotesSection`. Omitted entirely (not
+   * just empty) for documents where no OCR recovery ran, which is the
+   * common case and leaves the prompt exactly as before this feature.
+   */
+  recoveryNotes?: readonly DeterministicRecoveryNote[];
 }
 
 export async function analyzeContract(
@@ -57,6 +65,7 @@ export async function analyzeContract(
       contractType,
       analysisLanguage,
       jsonSchema,
+      options.recoveryNotes,
     );
   } catch (error) {
     if (!(error instanceof ContractAnalysisError) || error.code !== "RATE_LIMITED") {
@@ -83,6 +92,7 @@ export async function analyzeContract(
       contractType,
       analysisLanguage,
       jsonSchema,
+      options.recoveryNotes,
     );
   }
 }
@@ -99,10 +109,11 @@ async function runAnalysisAttempts(
   contractType: ContractType,
   analysisLanguage: AnalysisLanguage,
   jsonSchema: unknown,
+  recoveryNotes?: readonly DeterministicRecoveryNote[],
 ): Promise<ContractUnderstanding> {
   const firstResponse = await provider.generate({
     systemInstructions: SYSTEM_INSTRUCTIONS,
-    userPrompt: buildAnalysisPrompt(maskedText, contractType, analysisLanguage),
+    userPrompt: buildAnalysisPrompt(maskedText, contractType, analysisLanguage, recoveryNotes),
     jsonSchema,
   });
 
@@ -128,6 +139,7 @@ async function runAnalysisAttempts(
       previousResponseText: firstResponse.rawText,
       validationErrorSummary:
         firstAttempt.errorSummary ?? "The response was not valid JSON.",
+      recoveryNotes,
     }),
     jsonSchema,
   });

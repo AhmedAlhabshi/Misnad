@@ -148,6 +148,28 @@ export function run(): void {
     assert.equal(result.maximumSinglePayment.value, 20000);
   }
 
+  // Milestone 5.6C: a balloon/final payment is financing repayment, not an
+  // upfront (pre-financing) cash requirement — it must count toward
+  // maximumSinglePayment (still a real single payment) but never toward
+  // upfrontExposure (which feeds ratios.upfrontPaymentToBaseCost).
+  {
+    const downPayment = obligation({ id: "down", type: "upfront_payment", frequency: "one_time", amount: knownMoney(20000, "SAR", "test") });
+    const balloon = obligation({ id: "balloon", type: "balloon_payment", frequency: "one_time", amount: knownMoney(40000, "SAR", "test") });
+    const { result } = calculateExposure(
+      [downPayment, balloon],
+      [],
+      feeCollection([]),
+      penaltyCollection([]),
+      emptyRecurringCommitment,
+      unavailableMoney("n/a"),
+      unavailableMoney("n/a"),
+      noObligationRefundability,
+      noScheduledRecurring,
+    );
+    assert.equal(result.upfrontExposure.value, 20000, "the balloon payment must never inflate upfrontExposure");
+    assert.equal(result.maximumSinglePayment.value, 40000, "the balloon payment is still the largest single payment");
+  }
+
   // Refundable deposit treatment: included in upfront exposure (cash needed now) even though it is not "non-refundable cost".
   {
     const deposit = obligation({ id: "dep", type: "deposit", frequency: "one_time", mandatory: true, amount: knownMoney(2000, "SAR", "test") });

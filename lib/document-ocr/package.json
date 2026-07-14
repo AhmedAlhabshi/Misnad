@@ -1,0 +1,22 @@
+{
+  "name": "@workspace/document-ocr",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "tsx src/__tests__/textQuality.test.ts && tsx src/__tests__/textNormalizer.test.ts && tsx src/__tests__/errors.test.ts && tsx src/__tests__/config.test.ts && tsx src/__tests__/imagePreprocessor.test.ts && tsx src/__tests__/runOcrFallbackPipeline.test.ts && tsx src/__tests__/arabicNumberWords.test.ts && tsx src/__tests__/financialTextRecovery.test.ts && tsx src/__tests__/financialIntegrity.test.ts && tsx src/__tests__/candidateSelection.test.ts",
+    "test:real-ocr": "tsx src/__tests__/tesseractProvider.real.test.ts"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "1.0.2",
+    "pdfjs-dist": "6.1.200",
+    "tesseract.js": "7.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "catalog:"
+  }
+}

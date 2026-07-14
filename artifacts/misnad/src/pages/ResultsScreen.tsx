@@ -21,6 +21,7 @@ import {
   type ContractType,
 } from "@workspace/contract-types";
 import { getFieldLabel } from "@/lib/fieldLabels";
+import FinancialMetricsSection from "@/components/financialMetrics/FinancialMetricsSection";
 import type {
   StoredAnalysisResult,
   ImportantClause,
@@ -438,6 +439,13 @@ export default function ResultsScreen({
             </div>
           </div>
         )}
+
+        {/* 4.3b Financial Metrics (Milestone 5.8) */}
+        <FinancialMetricsSection
+          financialMetrics={analysisResult.financialMetrics}
+          financialMetricsError={analysisResult.financialMetricsError}
+          language={lang}
+        />
 
         {/* 4.4 Financial obligations */}
         {analysis.financialObligations.length > 0 && (

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import type { Request, Response } from "express";
 import { handleAnalyzeContract, type AnalyzeContractHandlerDeps } from "../analyzeContract";
-import type { ParsedDocument } from "../../services/documentParser";
+import type { DocumentExtractionResult } from "@workspace/document-ocr";
 import type { MaskedDocument, PiiStatistics } from "../../services/piiMasker";
 import type { ContractUnderstanding } from "@workspace/contract-schema";
 import type { FinancialMetrics } from "@workspace/financial-metrics";
@@ -10,9 +10,18 @@ function createMockReq(body: Record<string, unknown>): Request {
   return {
     file: { buffer: Buffer.from("not a real pdf"), originalname: "test.pdf" },
     body,
-    log: { warn() {} },
+    log: { warn() {}, info() {} },
   } as unknown as Request;
 }
+
+const FAKE_EXTRACTION: DocumentExtractionResult = {
+  method: "native",
+  text: "raw pdf text",
+  pageCount: 1,
+  quality: "good",
+  warnings: [],
+  metadata: { ocrUsed: false, processedPages: 1, skippedPages: 0, durationMs: 5 },
+};
 
 function createMockRes(): Response & { statusCode: number; body: unknown } {
   const res = {
@@ -36,6 +45,7 @@ const EMPTY_PII_STATISTICS: PiiStatistics = {
   names: 0,
   nationalIds: 0,
   iqamaNumbers: 0,
+  commercialRegistrations: 0,
   phones: 0,
   emails: 0,
   ibans: 0,
@@ -78,9 +88,9 @@ export async function run(): Promise<void> {
   let capturedFinancialMetricsArgs: unknown[] = [];
 
   const deps: AnalyzeContractHandlerDeps = {
-    async parseContractPdf(): Promise<ParsedDocument> {
+    async extractDocumentText(): Promise<DocumentExtractionResult> {
       parseCallCount += 1;
-      return { text: "raw pdf text", textLength: 12, textPreview: "raw pdf text" };
+      return FAKE_EXTRACTION;
     },
     maskPii(): MaskedDocument {
       maskCallCount += 1;

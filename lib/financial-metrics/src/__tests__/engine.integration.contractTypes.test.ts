@@ -129,6 +129,35 @@ export function run(): void {
     assert.equal(result.penalties.items[0].conditional, true);
   }
 
+  // 10. Regression: a percent-denominated penalty (auto_finance, matching the reported bug
+  // — `{ amount: 6, currency: "%" }` for "6% من قيمة القسط") must never be counted as 6 SAR.
+  {
+    const input = baseContractUnderstanding(
+      autoFinanceDetails({ financedAmount: 96000, downPayment: 24000, monthlyInstallment: 2400, loanTermMonths: 48 }),
+    );
+    input.fees = [fee({ description: "Administration fee", amount: 500, currency: "SAR", isRecurring: false })];
+    input.penalties = [
+      penalty({
+        description: "غرامة التأخير عن سداد القسط الشهري",
+        amount: 6,
+        currency: "%",
+        condition: "6% من قيمة القسط في حال التأخر عن السداد",
+      }),
+    ];
+    const result = calculateFinancialMetrics(input);
+    assert.equal(financialMetricsSchema.safeParse(result).success, true);
+
+    const penaltyItem = result.penalties.items[0];
+    assert.equal(penaltyItem.amount.status, "unavailable", "a percent-only penalty must never expose a monetary amount");
+    assert.equal(penaltyItem.percentage.status, "known");
+    assert.equal(penaltyItem.percentage.value, 6);
+    assert.equal(penaltyItem.trigger, "6% من قيمة القسط في حال التأخر عن السداد");
+
+    assert.notEqual(result.penalties.totalKnownPenalties.value, 6, "the percentage must never be summed in as 6 SAR");
+    assert.equal(result.penalties.totalKnownPenalties.status, "unavailable", "no penalty here has a known monetary amount");
+    assert.notEqual(result.exposure.contingentExposure.value, 6, "the percentage must never leak into monetary contingent exposure");
+  }
+
   console.log("PASS engine.integration.contractTypes.test.ts");
 }
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import type { Request, Response } from "express";
 import { handleAnalyzeContract, type AnalyzeContractHandlerDeps } from "../analyzeContract";
-import type { ParsedDocument } from "../../services/documentParser";
+import type { DocumentExtractionResult } from "@workspace/document-ocr";
 import type { MaskedDocument, PiiStatistics } from "../../services/piiMasker";
 import { ContractAnalysisError } from "@workspace/contract-analysis";
 import type { ContractUnderstanding } from "@workspace/contract-schema";
@@ -11,9 +11,18 @@ function createMockReq(body: Record<string, unknown>): Request {
   return {
     file: { buffer: Buffer.from("not a real pdf"), originalname: "test.pdf" },
     body,
-    log: { warn() {}, error() {} },
+    log: { warn() {}, error() {}, info() {} },
   } as unknown as Request;
 }
+
+const FAKE_EXTRACTION: DocumentExtractionResult = {
+  method: "native",
+  text: "raw pdf text",
+  pageCount: 1,
+  quality: "good",
+  warnings: [],
+  metadata: { ocrUsed: false, processedPages: 1, skippedPages: 0, durationMs: 5 },
+};
 
 function createMockRes(): Response & { statusCode: number; body: unknown } {
   const res = {
@@ -37,6 +46,7 @@ const EMPTY_PII_STATISTICS: PiiStatistics = {
   names: 0,
   nationalIds: 0,
   iqamaNumbers: 0,
+  commercialRegistrations: 0,
   phones: 0,
   emails: 0,
   ibans: 0,
@@ -72,8 +82,8 @@ const FAKE_ANALYSIS_RESULT: ContractUnderstanding = {
 
 function baseDeps(overrides: Partial<AnalyzeContractHandlerDeps> = {}): AnalyzeContractHandlerDeps {
   return {
-    async parseContractPdf(): Promise<ParsedDocument> {
-      return { text: "raw pdf text", textLength: 12, textPreview: "raw pdf text" };
+    async extractDocumentText(): Promise<DocumentExtractionResult> {
+      return FAKE_EXTRACTION;
     },
     maskPii(): MaskedDocument {
       return { maskedText: FAKE_MASKED_TEXT, statistics: EMPTY_PII_STATISTICS };

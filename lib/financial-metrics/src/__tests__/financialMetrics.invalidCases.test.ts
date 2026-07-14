@@ -59,6 +59,8 @@ function baseFinancialMetrics() {
       calculatedBaseCost: unavailableMoney("not stated"),
       calculatedCoreObligations: unavailableMoney("not stated"),
       calculatedKnownCost: unavailableMoney("not stated"),
+      financingRepaymentTotal: unavailableMoney("not stated"),
+      financingCost: unavailableMoney("not stated"),
       estimatedContractCost: unavailableMoney("not stated"),
       differenceFromStated: {
         classification: "unavailable" as const,

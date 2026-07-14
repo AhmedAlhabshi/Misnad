@@ -22,6 +22,9 @@
     },
     {
       "path": "../../lib/contract-types"
+    },
+    {
+      "path": "../../lib/financial-metrics"
     }
   ]
 }

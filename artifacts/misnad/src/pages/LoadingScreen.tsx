@@ -4,6 +4,7 @@ import { FileText, CheckCircle2, Loader2, Clock, XCircle } from "lucide-react";
 import {
   ANALYSIS_PROGRESS_STAGES,
   MAX_AUTO_COMPLETED_STAGES,
+  OCR_PROGRESS_STAGES,
   progressStageLabel,
   type ProgressStageStatus,
 } from "@/lib/analysisProgress";
@@ -53,6 +54,7 @@ export default function LoadingScreen({
   onAnalysisComplete: (result: StoredAnalysisResult) => void;
 }) {
   const [completedCount, setCompletedCount] = useState(0);
+  const [ocrStageIndex, setOcrStageIndex] = useState(-1);
   const [failed, setFailed] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -61,11 +63,24 @@ export default function LoadingScreen({
 
     let cancelled = false;
     setCompletedCount(0);
+    setOcrStageIndex(-1);
     setFailed(false);
     setErrorMessage(null);
 
+    // The base stage sequence estimates a typical (native-text) analysis.
+    // If the request is still pending once that sequence has run its
+    // course, the wait has genuinely gone on long enough to plausibly mean
+    // OCR is running on a scanned PDF — so, and only then, start advancing
+    // through the OCR-specific stages as an honest "this is taking longer"
+    // signal, never a claimed exact percentage.
     const interval = setInterval(() => {
-      setCompletedCount((count) => Math.min(count + 1, MAX_AUTO_COMPLETED_STAGES));
+      setCompletedCount((count) => {
+        if (count < MAX_AUTO_COMPLETED_STAGES) {
+          return count + 1;
+        }
+        setOcrStageIndex((ocrIndex) => Math.min(ocrIndex + 1, OCR_PROGRESS_STAGES.length - 1));
+        return count;
+      });
     }, STAGE_ADVANCE_INTERVAL_MS);
 
     async function run() {
@@ -102,6 +117,9 @@ export default function LoadingScreen({
           analysisLanguage: pendingUpload!.analysisLanguage,
           fileName: body.fileName ?? pendingUpload!.file.name,
           piiStatistics: body.piiStatistics ?? {},
+          financialMetrics: body.financialMetrics ?? null,
+          financialMetricsError: body.financialMetricsError ?? null,
+          documentExtraction: body.documentExtraction ?? null,
         };
 
         onAnalysisComplete(result);
@@ -147,8 +165,11 @@ export default function LoadingScreen({
 
       <div className="w-full flex flex-col gap-3">
         {ANALYSIS_PROGRESS_STAGES.map((stage, idx) => {
-          const isCompleted = idx < completedCount;
-          const isCurrent = idx === completedCount;
+          // Once the OCR-specific stages have started showing, the base
+          // sequence's final stage reads as completed (the wait has moved
+          // on to OCR-specific work) rather than perpetually "active".
+          const isCompleted = idx < completedCount || (idx === completedCount && ocrStageIndex >= 0);
+          const isCurrent = idx === completedCount && ocrStageIndex < 0;
           const isFailedStage = failed && isCurrent;
           const status: ProgressStageStatus = isCompleted
             ? "completed"
@@ -196,6 +217,57 @@ export default function LoadingScreen({
             </div>
           );
         })}
+        {ocrStageIndex >= 0 &&
+          OCR_PROGRESS_STAGES.slice(0, ocrStageIndex + 1).map((stage, idx) => {
+            const isCompleted = idx < ocrStageIndex;
+            const isCurrent = idx === ocrStageIndex;
+            const isFailedStage = failed && isCurrent;
+            const status: ProgressStageStatus = isCompleted
+              ? "completed"
+              : isFailedStage
+                ? "failed"
+                : isCurrent
+                  ? "active"
+                  : "pending";
+
+            return (
+              <div
+                key={`ocr-${idx}`}
+                data-testid={`progress-stage-ocr-${idx}`}
+                data-status={status}
+                className={`h-[52px] rounded-xl flex items-center px-4 gap-4 transition-all duration-300 ${
+                  status === "active" ? "bg-indigo-500/10 border border-indigo-500/20" : "bg-white/5 border border-white/5"
+                } ${status === "completed" ? "bg-emerald-500/10 border-emerald-500/20" : ""} ${
+                  status === "failed" ? "bg-red-500/10 border-red-500/20" : ""
+                }`}
+              >
+                <div className="shrink-0 w-6 flex justify-center">
+                  {status === "completed" ? (
+                    <CheckCircle2 size={20} className="text-emerald-500" />
+                  ) : status === "failed" ? (
+                    <XCircle size={20} className="text-red-500" />
+                  ) : status === "active" ? (
+                    <Loader2 size={20} className="text-indigo-400 animate-spin" />
+                  ) : (
+                    <Clock size={20} className="text-muted-foreground/50" />
+                  )}
+                </div>
+                <span
+                  className={`font-semibold text-[15px] ${
+                    status === "completed"
+                      ? "text-emerald-500"
+                      : status === "failed"
+                        ? "text-red-400"
+                        : status === "active"
+                          ? "text-indigo-400"
+                          : "text-muted-foreground"
+                  }`}
+                >
+                  {progressStageLabel(stage, pendingUpload.analysisLanguage)}
+                </span>
+              </div>
+            );
+          })}
       </div>
 
       {failed ? (

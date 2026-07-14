@@ -35,7 +35,12 @@ export function run(): void {
     assert.equal(result.upfrontPaymentToBaseCost.value, 10);
   }
 
-  // Finance-cost ratio (totalCostIncrease): (total - principal) / principal × 100.
+  // Finance-cost ratio (totalCostIncrease): financingCost ÷ principal × 100.
+  // `financingCost` (already `financingRepaymentTotal - principal`, scoped to
+  // exclude pre-financing amounts) is precomputed by `costs.ts` — ratios.ts
+  // no longer subtracts principal itself, so the input here is the
+  // already-subtracted 8,000 (10% of the 80,000 principal), not a total
+  // repayment figure.
   {
     const { result } = calculateRatios(
       principal,
@@ -43,16 +48,20 @@ export function run(): void {
       unavailableMoney("n/a"),
       unavailableMoney("n/a"),
       unavailableMoney("n/a"),
-      knownMoney(88000, "SAR", "test"),
+      knownMoney(8000, "SAR", "test"),
       unavailableMoney("n/a"),
       unavailableMoney("n/a"),
     );
     assert.equal(result.totalCostIncrease.value, 10);
   }
 
-  // An incomplete calculatedKnownCost (below principal, e.g. because duration was
-  // unavailable so scheduled payments couldn't be totaled) must be reported
-  // unavailable, never a fabricated negative finance-cost ratio.
+  // An unavailable financingCost (e.g. because costs.ts determined repayment
+  // was below principal, or duration was unavailable so scheduled payments
+  // couldn't be totaled) must propagate as unavailable here too, never a
+  // fabricated ratio — this now relies on `computeRatio`'s generic
+  // null-check rather than a bespoke below-principal check (that check now
+  // lives in `costs.ts`, where `financingCost` itself is computed; see
+  // `calculators.costs.test.ts`).
   {
     const { result } = calculateRatios(
       principal,
@@ -60,7 +69,7 @@ export function run(): void {
       unavailableMoney("n/a"),
       unavailableMoney("n/a"),
       unavailableMoney("n/a"),
-      knownMoney(150, "SAR", "test"),
+      unavailableMoney("repayment is below principal — incomplete data"),
       unavailableMoney("n/a"),
       unavailableMoney("n/a"),
     );

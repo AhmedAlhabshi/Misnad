@@ -1,16 +1,34 @@
 import type { PaymentFrequency } from "../enums";
 
-/** Collapses whitespace and case for reliable, deterministic keyword/label matching. */
+/**
+ * Strips a leading Arabic definite article ("ال") from the start of each
+ * word. Real contract text uses the definite article inconsistently (e.g.
+ * "الدفعة المقدمة" vs "دفعة مقدمة" for the same concept, "down payment"), so
+ * without this a keyword list written one way silently fails to match text
+ * written the other way — this is a general Arabic-text concern, not tied to
+ * any specific keyword or contract type.
+ */
+function stripArabicDefiniteArticles(text: string): string {
+  return text.replace(/(^|\s)ال(?=\S)/g, "$1");
+}
+
+/** Collapses whitespace and case, and normalizes the Arabic definite article, for reliable, deterministic keyword/label matching. */
 export function normalizeLabel(raw: string | null | undefined): string {
   if (typeof raw !== "string") {
     return "";
   }
-  return raw.trim().toLowerCase().replace(/\s+/g, " ");
+  return stripArabicDefiniteArticles(raw.trim().toLowerCase().replace(/\s+/g, " "));
 }
 
+/**
+ * Both `text` and every `keyword` are normalized identically (including
+ * definite-article stripping) before matching — a keyword written without
+ * "ال" (e.g. "دفعة مقدمة") must still match text that uses it (e.g. "الدفعة
+ * المقدمة"), and vice versa.
+ */
 export function containsAnyKeyword(text: string, keywords: readonly string[]): boolean {
   const normalized = normalizeLabel(text);
-  return keywords.some((keyword) => normalized.includes(keyword.toLowerCase()));
+  return keywords.some((keyword) => normalized.includes(normalizeLabel(keyword)));
 }
 
 /**

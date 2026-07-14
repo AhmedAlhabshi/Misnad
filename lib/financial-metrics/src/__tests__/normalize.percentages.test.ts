@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { normalizePercentageValue } from "../normalize/percentages";
+import { isPercentCurrencyText, normalizePercentageValue } from "../normalize/percentages";
 
 export function run(): void {
   assert.equal(normalizePercentageValue(5), 5, "5 (percentage points) must be used as-is, not reinterpreted as 0.05");
@@ -10,6 +10,16 @@ export function run(): void {
   assert.equal(normalizePercentageValue(-5), null, "a negative percentage must be rejected");
   assert.equal(normalizePercentageValue(Number.NaN), null);
   assert.equal(normalizePercentageValue(Number.POSITIVE_INFINITY), null);
+
+  assert.equal(isPercentCurrencyText("%"), true);
+  assert.equal(isPercentCurrencyText("٪"), true);
+  assert.equal(isPercentCurrencyText("percent"), true);
+  assert.equal(isPercentCurrencyText("Percentage"), true);
+  assert.equal(isPercentCurrencyText(" 6% "), true, "a symbol embedded alongside other text must still be detected");
+  assert.equal(isPercentCurrencyText("SAR"), false);
+  assert.equal(isPercentCurrencyText(null), false);
+  assert.equal(isPercentCurrencyText(undefined), false);
+  assert.equal(isPercentCurrencyText(""), false);
 
   console.log("PASS normalize.percentages.test.ts");
 }

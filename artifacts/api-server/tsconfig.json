@@ -19,6 +19,9 @@
       "path": "../../lib/contract-analysis"
     },
     {
+      "path": "../../lib/document-ocr"
+    },
+    {
       "path": "../../lib/contract-schema"
     },
     {

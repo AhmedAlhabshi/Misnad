@@ -65,11 +65,15 @@ function collect(name: string, computation: RatioComputation, metadata: Calculat
 /**
  * `feesToBaseCost`, `penaltiesToBaseCost`, `upfrontPaymentToBaseCost`,
  * `balloonPaymentToBaseCost`, `totalCostIncrease` (the spec's "finance-cost
- * ratio": `(total repayment - principal) / principal`), and
- * `recurringPaymentToIncome` are the only ratios Milestone 5.5's schema
- * defines — see the engine's final report for two ratios described in the
- * Milestone 5.6 prompt (total-outflow-to-principal, credit utilization)
- * that have no corresponding schema field.
+ * ratio": `financingCost ÷ financedPrincipal`, where `financingCost` is
+ * `financingRepaymentTotal - principal` — see `calculators/costs.ts` for the
+ * full financial-scope model; this ratio deliberately never uses
+ * `calculatedKnownCost`/`calculatedCoreObligations`, since those mix in
+ * pre-financing amounts like a down payment), and `recurringPaymentToIncome`
+ * are the only ratios Milestone 5.5's schema defines — see the engine's
+ * final report for two ratios described in the Milestone 5.6 prompt
+ * (total-outflow-to-principal, credit utilization) that have no
+ * corresponding schema field.
  */
 export function calculateRatios(
   principal: MoneyMetric,
@@ -77,7 +81,7 @@ export function calculateRatios(
   totalKnownPenalties: MoneyMetric,
   upfrontExposure: MoneyMetric,
   balloonPaymentAmount: MoneyMetric,
-  calculatedKnownCost: MoneyMetric,
+  financingCost: MoneyMetric,
   monthlyCommitment: MoneyMetric,
   monthlyIncome: MoneyMetric,
 ): { result: FinancialRatios; metadata: CalculatorMetadata } {
@@ -104,41 +108,17 @@ export function calculateRatios(
     metadata,
   );
 
-  // Finance-cost ratio: (total repayment − principal) ÷ principal × 100. A
-  // known total repayment that is *incomplete* (e.g. the contract duration
-  // is unavailable, so scheduled recurring payments could not be totaled)
-  // can come out below principal — that is missing data, not a real
-  // negative finance cost, so it is reported unavailable rather than
-  // emitting a negative value the schema (correctly) forbids.
-  let totalCostIncrease: PercentageMetric;
-  if (
-    calculatedKnownCost.value !== null &&
-    calculatedKnownCost.currency !== null &&
-    principal.value !== null &&
-    principal.currency !== null &&
-    calculatedKnownCost.currency === principal.currency &&
-    principal.value !== 0 &&
-    calculatedKnownCost.value >= principal.value
-  ) {
-    const financeCost: MoneyMetric = {
-      value: calculatedKnownCost.value - principal.value,
-      currency: principal.currency,
-      status: "known",
-      source: "calculatedKnownCost - principal",
-      reason: null,
-      confidence: "medium",
-    };
-    totalCostIncrease = collect(
-      "ratios.totalCostIncrease",
-      computeRatio(financeCost, principal, "ratios.totalCostIncrease", "(calculatedKnownCost - principal) ÷ principal × 100"),
-      metadata,
-    );
-  } else {
-    totalCostIncrease = unavailablePercentage(
-      "calculatedKnownCost and principal must both be known, non-zero, in the same currency, and calculatedKnownCost must not be below principal",
-    );
-    metadata.unavailable.push("ratios.totalCostIncrease");
-  }
+  // Finance-cost ratio: financingCost ÷ principal × 100. `financingCost` is
+  // precomputed by `costs.ts` (`financingRepaymentTotal - principal`, scoped
+  // to exclude pre-financing amounts) and already reports `unavailable` when
+  // repayment is incomplete/below principal — this reuses the same generic
+  // `computeRatio` safety checks (both known, same currency, non-zero
+  // denominator) as every other ratio here, rather than a bespoke check.
+  const totalCostIncrease = collect(
+    "ratios.totalCostIncrease",
+    computeRatio(financingCost, principal, "ratios.totalCostIncrease", "financingCost ÷ principal × 100"),
+    metadata,
+  );
 
   const recurringPaymentToIncome = collect(
     "ratios.recurringPaymentToIncome",

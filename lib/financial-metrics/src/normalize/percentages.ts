@@ -15,3 +15,26 @@ export function normalizePercentageValue(value: number | null | undefined): numb
   }
   return value;
 }
+
+const PERCENT_CURRENCY_TEXTS = new Set(["%", "٪", "percent", "percentage", "pct"]);
+
+/**
+ * Detects when a `currency`-labeled field actually holds a percent marker
+ * rather than a real currency (e.g. a penalty the model described as
+ * `{ amount: 6, currency: "%" }` for "6% of the installment value") — the
+ * `ContractUnderstanding` schema has no dedicated percentage field for
+ * penalties/fees, so the model has no other way to express this.
+ */
+export function isPercentCurrencyText(raw: string | null | undefined): boolean {
+  if (typeof raw !== "string") {
+    return false;
+  }
+  const trimmed = raw.trim().toLowerCase();
+  if (trimmed.length === 0) {
+    return false;
+  }
+  if (trimmed.includes("%") || trimmed.includes("٪")) {
+    return true;
+  }
+  return PERCENT_CURRENCY_TEXTS.has(trimmed);
+}

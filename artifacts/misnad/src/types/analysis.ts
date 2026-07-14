@@ -1,4 +1,5 @@
 import type { AnalysisLanguage, ContractType } from "@workspace/contract-types";
+import type { FinancialMetrics } from "@workspace/financial-metrics";
 
 export type RiskLevel = "low" | "medium" | "high";
 
@@ -83,6 +84,35 @@ export interface ContractAnalysisResult {
   typeDetails: TypeDetails;
 }
 
+/**
+ * Public, user-safe error shape for a Financial Metrics calculation failure
+ * — mirrors `FinancialMetricsPublicError` from the api-server route layer.
+ * Deliberately not imported from the backend package: this is an
+ * API-response-layer concern, not part of the `@workspace/financial-metrics`
+ * schema itself.
+ */
+export interface FinancialMetricsPublicError {
+  code: "FINANCIAL_METRICS_FAILED";
+  message: string;
+}
+
+/**
+ * Safe, non-content summary of how the PDF's text was obtained (native text
+ * layer vs. Scanned PDF OCR Fallback) — never the raw/masked text itself.
+ * Absent on older backend responses — the UI must not break if missing.
+ */
+export interface DocumentExtractionSummary {
+  method: "native" | "ocr";
+  pageCount: number;
+  quality: "good" | "partial" | "poor";
+  warnings: string[];
+  ocrUsed: boolean;
+  durationMs: number;
+  processedPages: number;
+  skippedPages: number;
+  languages?: string[];
+}
+
 /** Shape of the /api/analyze-contract JSON response that the frontend relies on. */
 export interface AnalyzeContractApiResponse {
   success: boolean;
@@ -91,6 +121,12 @@ export interface AnalyzeContractApiResponse {
   piiStatistics?: Record<string, unknown>;
   analysis?: ContractAnalysisResult | null;
   analysisError?: string;
+  /** Absent on older backend responses — treated the same as `null` (see LoadingScreen.tsx). */
+  financialMetrics?: FinancialMetrics | null;
+  /** Absent on older backend responses — treated the same as `null` (see LoadingScreen.tsx). */
+  financialMetricsError?: FinancialMetricsPublicError | null;
+  /** Absent on older backend responses — the UI must not break if missing. */
+  documentExtraction?: DocumentExtractionSummary;
 }
 
 export interface PendingUpload {
@@ -105,4 +141,8 @@ export interface StoredAnalysisResult {
   analysisLanguage: AnalysisLanguage;
   fileName: string;
   piiStatistics: Record<string, unknown>;
+  financialMetrics: FinancialMetrics | null;
+  financialMetricsError: FinancialMetricsPublicError | null;
+  /** Absent when the backend response didn't include it (older backend) — never assume OCR was or wasn't used in that case. */
+  documentExtraction: DocumentExtractionSummary | null;
 }

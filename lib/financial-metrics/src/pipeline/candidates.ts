@@ -1,6 +1,7 @@
 import type { ContractUnderstanding } from "@workspace/contract-schema";
 import type { Confidence, FeeType, ObligationType, PaymentFrequency, PenaltyType } from "../enums";
 import { normalizeCurrencyCode, sanitizeNumericAmount } from "../normalize/money";
+import { isPercentCurrencyText, normalizePercentageValue } from "../normalize/percentages";
 import { classifyFrequencyText } from "../normalize/text";
 import {
   classifyFeeTypeText,
@@ -217,17 +218,29 @@ function extractFromFees(input: ContractUnderstanding): Candidate[] {
 }
 
 function extractFromPenalties(input: ContractUnderstanding): Candidate[] {
-  return input.penalties.map((penalty, index) => ({
-    ...baseCandidate("penalty_item", `penalties[${index}]`),
-    targetKind: "penalty" as const,
-    penaltyType: classifyPenaltyTypeText(penalty.description, penalty.condition),
-    label: penalty.description,
-    amountValue: sanitizeNumericAmount(penalty.amount),
-    currency: normalizeCurrencyCode(penalty.currency),
-    conditional: true,
-    trigger: penalty.condition,
-    evidence: penalty.description ?? penalty.condition,
-  }));
+  return input.penalties.map((penalty, index) => {
+    // The schema has no dedicated percentage field for penalties, so a
+    // percent-denominated penalty (e.g. "6% of the installment value") comes
+    // back as `{ amount: 6, currency: "%" }`. Routing that into
+    // `percentageValue` (and leaving `amountValue`/`currency` both null)
+    // keeps it out of every monetary sum (`totalKnownPenalties`,
+    // `contingentExposure`) — a percentage is not a SAR amount, and treating
+    // its raw number as one would silently understate or overstate real
+    // monetary exposure.
+    const isPercentPenalty = isPercentCurrencyText(penalty.currency);
+    return {
+      ...baseCandidate("penalty_item", `penalties[${index}]`),
+      targetKind: "penalty" as const,
+      penaltyType: classifyPenaltyTypeText(penalty.description, penalty.condition),
+      label: penalty.description,
+      amountValue: isPercentPenalty ? null : sanitizeNumericAmount(penalty.amount),
+      currency: isPercentPenalty ? null : normalizeCurrencyCode(penalty.currency),
+      percentageValue: isPercentPenalty ? normalizePercentageValue(penalty.amount) : null,
+      conditional: true,
+      trigger: penalty.condition,
+      evidence: penalty.description ?? penalty.condition,
+    };
+  });
 }
 
 /** Numbers whose `unit` confidently reads as a currency — everything else (percentages, durations, unrecognized units) is left out rather than guessed into a monetary role. */
@@ -469,8 +482,14 @@ const SPECIAL_KEY_TO_ROLE: Record<SpecialValueKey, CandidateSemanticRole> = {
  * signal; a generic `targetKind: "obligation"` candidate (from
  * `financialObligations[]`/`extractedNumbers[]`/`typeDetails`) is the one
  * case that can describe a concept Milestone 4 has no dedicated field for
- * (an asset's value, a restated principal, an early-settlement scenario
- * amount) — text is the only available signal for those.
+ * (an asset's value, a restated principal, a stated total cost, an
+ * early-settlement scenario amount) — text is the only available signal for
+ * those. This matters beyond just labeling: `extractStatedTotalCostCandidates`
+ * (above) already extracts a "reference_value"-role `special` candidate for
+ * a stated-total-cost line item from the *same* source array, so without
+ * this check here, the very same line item would *also* survive as an
+ * ordinary payment obligation and be double-counted on top of the itemized
+ * figures it is summarizing.
  */
 function deriveSemanticRole(candidate: Candidate): CandidateSemanticRole {
   if (candidate.specialKey) {
@@ -486,6 +505,9 @@ function deriveSemanticRole(candidate: Candidate): CandidateSemanticRole {
 
   if (isAssetValueText(candidate.label, candidate.evidence)) {
     return "asset_value";
+  }
+  if (isStatedTotalCostText(candidate.label, candidate.evidence)) {
+    return "reference_value";
   }
   const scenario = classifyScenarioContext(candidate.label, candidate.evidence, candidate.trigger);
   if (scenario !== null) {

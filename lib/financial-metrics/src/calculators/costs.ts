@@ -1,5 +1,5 @@
 import type { ContractDuration } from "../contractDuration";
-import type { CostDifferenceClassification } from "../enums";
+import type { CostDifferenceClassification, ObligationType } from "../enums";
 import type { FeeCollection, FeeItem } from "../fee";
 import type { MoneyMetric } from "../moneyMetric";
 import type { PaymentObligation } from "../paymentObligation";
@@ -12,6 +12,17 @@ import { round2 } from "../utils/rounding";
 import { emptyMetadata, mergeMetadata, type CalculatorMetadata } from "./metadata";
 
 const RECURRING_FREQUENCIES = new Set(["daily", "weekly", "monthly", "quarterly", "semi_annual", "annual"]);
+
+/**
+ * Among one-time obligations, only a balloon/final payment repays the
+ * financed principal — a down payment, an upfront fee-like obligation, a tax,
+ * or any other one-time type reduces what needed to be financed (or is
+ * otherwise unrelated to repayment) rather than repaying it. This is the
+ * only scope distinction `financingRepaymentTotal` needs: everything else
+ * one-time is "pre-financing" by exclusion, which is the conservative
+ * default (never assumes an unclassified one-time obligation repays a loan).
+ */
+const FINANCING_REPAYMENT_ONE_TIME_TYPES: ReadonlySet<ObligationType> = new Set(["balloon_payment"]);
 
 export function buildFeeCollection(items: readonly FeeItem[]): { result: FeeCollection; metadata: CalculatorMetadata } {
   const metadata = emptyMetadata();
@@ -159,22 +170,30 @@ function classifyDifference(stated: number, calculated: number): CostDifferenceC
 /**
  * Milestone 5.5 field semantics used by this calculator (no field-level
  * docs were committed with the schema itself, so this engine is the
- * authority on what each field means — see the Milestone 5.6 correction
- * report for the full rationale):
+ * authority on what each field means — see the Milestone 5.6/5.6C
+ * correction reports for the full rationale):
  *
  * - `calculatedBaseCost`: the principal/financed amount alone.
- * - `calculatedCoreObligations`: the guaranteed, normal-path total — one-time
- *   obligations that are mandatory, non-conditional, and (for deposits)
- *   *confirmed* non-refundable, plus the scheduled recurring commitment
- *   over the known duration, plus mandatory non-conditional fees.
- * - `calculatedKnownCost`: the same known, normal-path total as
- *   `calculatedCoreObligations`. It never adds conditional/contingent
- *   amounts (late fees, early-termination fees, deductibles, other
- *   event-triggered charges) merely because their amount happens to be
- *   known — a known amount does not make an event-triggered charge part of
- *   the guaranteed cost of the normal contract path. Those amounts remain
- *   fully visible in `fees.conditionalFees`, `penalties`, and
- *   `exposure.contingentExposure`.
+ * - `calculatedCoreObligations`/`calculatedKnownCost`: the guaranteed,
+ *   normal-path *total cash outflow* — every mandatory, non-conditional
+ *   one-time obligation (both pre-financing amounts like a down payment AND
+ *   any balloon/final financing repayment), plus the scheduled recurring
+ *   commitment over the known duration, plus mandatory non-conditional
+ *   fees. `calculatedKnownCost` never additionally folds in
+ *   conditional/contingent amounts (late fees, early-termination fees,
+ *   deductibles) merely because their amount happens to be known — those
+ *   remain fully visible in `fees.conditionalFees`, `penalties`, and
+ *   `exposure.contingentExposure`. This total deliberately mixes scopes (a
+ *   down payment is not part of what was financed, yet is included here) —
+ *   see `financingRepaymentTotal`/`financingCost` below for the
+ *   financing-only scope, and never derive a financing-cost percentage from
+ *   this total directly.
+ * - `financingRepaymentTotal`/`financingCost`: the financing-only scope —
+ *   see `totalCost.ts`'s field docs. Computed from the *same* one-time
+ *   obligations and recurring commitment as `calculatedCoreObligations`,
+ *   just split by `ObligationType` (see `FINANCING_REPAYMENT_ONE_TIME_TYPES`)
+ *   instead of merged, so this never requires re-deriving amounts from
+ *   scratch or risks drifting out of sync with the cash-outflow total.
  */
 export function calculateTotalCost(
   principal: MoneyMetric,
@@ -198,11 +217,30 @@ export function calculateTotalCost(
       sourceField: obligation.sourceFields[0] ?? obligation.id,
     });
   }
-  const oneTimeAmounts: MoneyMetric[] = eligibleOneTimeObligations.map((obligation) => obligation.amount);
-  const oneTimeTotal = sumKnownMoneyMetrics(
-    oneTimeAmounts,
-    "sum of mandatory one-time obligations (confirmed non-refundable, for deposits)",
-    "no mandatory one-time obligation has a fully known, confirmed non-refundable amount",
+
+  // Split guaranteed one-time obligations by financial scope: a balloon/final
+  // payment repays the financed principal (financing repayment); everything
+  // else one-time (down payment, upfront fee-like obligation, tax, ...) is
+  // pre-financing cash paid outside the loan itself. This is the only split
+  // needed — both sums recombine into the same `calculatedCoreObligations`
+  // total as before, so that total's value never changes; only the
+  // financing-only scope becomes separately available.
+  const financingRepaymentOneTime = eligibleOneTimeObligations.filter((obligation) =>
+    FINANCING_REPAYMENT_ONE_TIME_TYPES.has(obligation.type),
+  );
+  const preFinancingOneTime = eligibleOneTimeObligations.filter(
+    (obligation) => !FINANCING_REPAYMENT_ONE_TIME_TYPES.has(obligation.type),
+  );
+
+  const preFinancingOneTimeTotal = sumKnownMoneyMetrics(
+    preFinancingOneTime.map((obligation) => obligation.amount),
+    "sum of mandatory pre-financing one-time obligations (confirmed non-refundable, for deposits)",
+    "no mandatory pre-financing one-time obligation has a fully known, confirmed non-refundable amount",
+  );
+  const financingRepaymentOneTimeTotal = sumKnownMoneyMetrics(
+    financingRepaymentOneTime.map((obligation) => obligation.amount),
+    "sum of balloon/final financing repayment obligations",
+    "no balloon or final financing repayment obligation has a fully known amount",
   );
 
   const { result: totalScheduledRecurring, metadata: recurringMetadata } = calculateTotalScheduledRecurring(
@@ -210,7 +248,18 @@ export function calculateTotalCost(
     contractDuration,
   );
 
-  const coreParts = [oneTimeTotal, totalScheduledRecurring, mandatoryFees];
+  // The scheduled repayment total (recurring commitment + any balloon) is
+  // computed once and reused for both `calculatedCoreObligations` (always,
+  // regardless of contract type) and the publicly-exposed
+  // `financingRepaymentTotal` (only when a financed principal is known — see
+  // the applicability gate below).
+  const scheduledRepaymentTotal = sumKnownMoneyMetrics(
+    [totalScheduledRecurring, financingRepaymentOneTimeTotal],
+    "sum of scheduled recurring repayment and any balloon/final repayment",
+    "no scheduled repayment amount is known",
+  );
+
+  const coreParts = [preFinancingOneTimeTotal, scheduledRepaymentTotal, mandatoryFees];
   const calculatedCoreObligations = sumKnownMoneyMetrics(
     coreParts,
     "sum of guaranteed one-time obligations, scheduled recurring commitment, and mandatory fees",
@@ -224,6 +273,33 @@ export function calculateTotalCost(
     calculatedCoreObligations.status === "known"
       ? { ...calculatedCoreObligations, source: "equals calculatedCoreObligations (conditional/contingent amounts excluded)" }
       : calculatedCoreObligations;
+
+  // `financingRepaymentTotal` only applies when this contract actually
+  // finances a principal amount — a lease's cumulative rent or a
+  // subscription's cumulative billing is not "financing repayment", even
+  // though it goes through the same recurring-commitment machinery. Reusing
+  // `principal.status` (the "was a financed/loan amount found" signal that
+  // already exists for every contract type) as the applicability gate avoids
+  // any new contract-type-specific special-casing.
+  const financingRepaymentTotal: MoneyMetric =
+    principal.status === "known"
+      ? scheduledRepaymentTotal
+      : unavailableMoney(
+          "no financed principal was found in the contract — this metric only applies when a principal/financed amount is known",
+        );
+
+  const financingCost: MoneyMetric =
+    financingRepaymentTotal.value !== null &&
+    financingRepaymentTotal.currency !== null &&
+    principal.value !== null &&
+    principal.currency !== null &&
+    financingRepaymentTotal.currency === principal.currency &&
+    principal.value !== 0 &&
+    financingRepaymentTotal.value >= principal.value
+      ? knownMoney(financingRepaymentTotal.value - principal.value, principal.currency, "financingRepaymentTotal - calculatedBaseCost")
+      : unavailableMoney(
+          "financingRepaymentTotal and the financed principal must both be known, non-zero, in the same currency, and repayment must not be below principal",
+        );
 
   const hasGaps = contractDuration.status !== "known" || calculatedCoreObligations.status !== "known";
 
@@ -262,6 +338,8 @@ export function calculateTotalCost(
       calculatedBaseCost: principal,
       calculatedCoreObligations,
       calculatedKnownCost,
+      financingRepaymentTotal,
+      financingCost,
       estimatedContractCost,
       differenceFromStated,
     },

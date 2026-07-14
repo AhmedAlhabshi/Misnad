@@ -306,6 +306,70 @@ export function run(): void {
     assert.equal(result.calculatedCoreObligations.value, 28000);
   }
 
+  // Milestone 5.6C financial-scope model: a down payment (pre-financing) and
+  // a balloon payment (financing repayment) split into different scopes,
+  // even though both are "one-time, mandatory" obligations. The reported
+  // bug: comparing a total that mixes both scopes against principal
+  // overstated the financing-cost ratio.
+  {
+    const principal = knownMoney(70000, "SAR", "test");
+    const commitment = recurringCommitment(1662.5); // 1662.5 * 48 = 79800
+    const duration48Months = { ...knownDuration, months: 48 };
+    const downPayment = obligation({ id: "obligation-0", type: "upfront_payment", frequency: "one_time", amount: knownMoney(20000, "SAR", "test") });
+    const { result } = calculateTotalCost(
+      principal,
+      [downPayment],
+      new Map(),
+      unavailableMoney("none"),
+      commitment,
+      duration48Months,
+      unavailableMoney("none"),
+    );
+    // calculatedCoreObligations (total cash outflow) still mixes both scopes: 20000 + 79800 = 99800.
+    assert.equal(result.calculatedCoreObligations.value, 99800);
+    // financingRepaymentTotal excludes the down payment: 1662.5 * 48 = 79800 (no balloon here).
+    assert.equal(result.financingRepaymentTotal.value, 79800);
+    // financingCost = 79800 - 70000 = 9800, never 99800 - 70000 = 29800.
+    assert.equal(result.financingCost.value, 9800);
+  }
+
+  // A balloon payment counts toward financingRepaymentTotal (financing
+  // repayment), not the pre-financing upfront scope, even though it is a
+  // one-time, mandatory obligation exactly like a down payment structurally.
+  {
+    const principal = knownMoney(50000, "SAR", "test");
+    const commitment = recurringCommitment(1000); // 1000 * 12 = 12000
+    const balloon = obligation({ id: "balloon", type: "balloon_payment", frequency: "one_time", amount: knownMoney(40000, "SAR", "test") });
+    const { result } = calculateTotalCost(principal, [balloon], new Map(), unavailableMoney("none"), commitment, knownDuration, unavailableMoney("none"));
+    // financingRepaymentTotal = 12000 (recurring) + 40000 (balloon) = 52000.
+    assert.equal(result.financingRepaymentTotal.value, 52000);
+    assert.equal(result.financingCost.value, 2000, "52000 - 50000 = 2000");
+    // calculatedCoreObligations also includes the balloon: 12000 + 40000 = 52000 (no separate upfront amount here).
+    assert.equal(result.calculatedCoreObligations.value, 52000);
+  }
+
+  // financingRepaymentTotal/financingCost are unavailable — with a clear
+  // reason, never a fabricated denominator — when no financed principal was
+  // found at all (e.g. a lease or subscription, which have no "principal"
+  // concept), even though a recurring commitment exists.
+  {
+    const commitment = recurringCommitment(2000);
+    const { result } = calculateTotalCost(
+      unavailableMoney("no principal in this contract type"),
+      [],
+      new Map(),
+      unavailableMoney("none"),
+      commitment,
+      knownDuration,
+      unavailableMoney("none"),
+    );
+    assert.equal(result.financingRepaymentTotal.status, "unavailable");
+    assert.ok(result.financingRepaymentTotal.reason);
+    assert.equal(result.financingCost.status, "unavailable");
+    // calculatedCoreObligations is unaffected by the missing principal — a lease's total rent is still a real cash-outflow total.
+    assert.equal(result.calculatedCoreObligations.value, 24000);
+  }
+
   console.log("PASS calculators.costs.test.ts");
 }
 

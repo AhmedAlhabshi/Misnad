@@ -1,8 +1,9 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import multer from "multer";
-import { parseContractPdf } from "../services/documentParser";
+import { extractDocumentText } from "../services/documentParser";
 import { maskPii } from "../services/piiMasker";
 import { analyzeContract, ContractAnalysisError } from "@workspace/contract-analysis";
+import { DocumentOcrError, type DocumentExtractionResult } from "@workspace/document-ocr";
 import type { ContractUnderstanding } from "@workspace/contract-schema";
 import { isAnalysisLanguage, isContractType } from "@workspace/contract-types";
 import {
@@ -41,18 +42,52 @@ export interface FinancialMetricsPublicError {
  * never passes this — the real implementations are the default.
  */
 export interface AnalyzeContractHandlerDeps {
-  parseContractPdf: typeof parseContractPdf;
+  extractDocumentText: typeof extractDocumentText;
   maskPii: typeof maskPii;
   analyzeContract: typeof analyzeContract;
   calculateFinancialMetrics: typeof calculateFinancialMetrics;
 }
 
 const defaultDeps: AnalyzeContractHandlerDeps = {
-  parseContractPdf,
+  extractDocumentText,
   maskPii,
   analyzeContract,
   calculateFinancialMetrics,
 };
+
+/**
+ * Public, response-layer summary of how a document's text was obtained —
+ * safe to send to the frontend as-is (no raw content, only
+ * method/quality/counters). The financial-integrity fields are only ever
+ * present when a tracked financial label was actually found (see
+ * `buildFinancialMetadataFields` in `runOcrFallbackPipeline.ts`) — omitted
+ * entirely, not just `undefined`, for a non-financial document, so this
+ * response shape is unchanged for the vast majority of existing callers.
+ */
+function toDocumentExtractionSummary(extraction: DocumentExtractionResult) {
+  return {
+    method: extraction.method,
+    pageCount: extraction.pageCount,
+    quality: extraction.quality,
+    warnings: extraction.warnings,
+    ocrUsed: extraction.metadata.ocrUsed,
+    durationMs: extraction.metadata.durationMs,
+    processedPages: extraction.metadata.processedPages,
+    skippedPages: extraction.metadata.skippedPages,
+    ...(extraction.metadata.languages ? { languages: extraction.metadata.languages } : {}),
+    ...(extraction.metadata.financialQuality !== undefined ? { financialQuality: extraction.metadata.financialQuality } : {}),
+    ...(extraction.metadata.financialQualityScore !== undefined
+      ? { financialQualityScore: extraction.metadata.financialQualityScore }
+      : {}),
+    ...(extraction.metadata.recoveredFinancialValues !== undefined
+      ? { recoveredFinancialValues: extraction.metadata.recoveredFinancialValues }
+      : {}),
+    ...(extraction.metadata.financialRecoveryWarnings ? { financialRecoveryWarnings: extraction.metadata.financialRecoveryWarnings } : {}),
+    ...(extraction.metadata.selectedOcrCandidate !== undefined
+      ? { selectedOcrCandidate: extraction.metadata.selectedOcrCandidate }
+      : {}),
+  };
+}
 
 export async function handleAnalyzeContract(
   req: Request,
@@ -83,11 +118,15 @@ export async function handleAnalyzeContract(
   }
 
   try {
-    // Stage 1: Extract text from PDF
-    const parsed = await deps.parseContractPdf(req.file.buffer);
+    // Stage 1: Extract text from the PDF — this one call is the sole
+    // decision-maker for native-text-layer versus OCR; the route never
+    // inspects text length or quality itself.
+    const extraction = await deps.extractDocumentText(req.file.buffer, {
+      onEvent: (event, meta) => req.log.info({ event, ...meta }, event),
+    });
 
     // Stage 2: Mask PII before any future AI processing
-    const masked = deps.maskPii(parsed.text);
+    const masked = deps.maskPii(extraction.text);
 
     // Stage 3: AI contract understanding (additive feature — failure here must
     // never fail the upload/extraction/masking flow above). Uses only the
@@ -100,6 +139,7 @@ export async function handleAnalyzeContract(
         masked.maskedText,
         userSelectedContractType,
         analysisLanguage,
+        { recoveryNotes: extraction.recoveredFinancialValues },
       );
     } catch (err) {
       analysisError =
@@ -143,26 +183,40 @@ export async function handleAnalyzeContract(
       }
     }
 
-    // DEV NOTE: dual output (rawText + maskedText) is temporary — remove before production
+    const isProduction = process.env.NODE_ENV === "production";
+
     res.json({
       success: true,
       fileName: req.file.originalname,
       message: "PDF processed and PII masked successfully",
-      textLength: parsed.textLength,
-      textPreview: parsed.textPreview,
-      maskedTextPreview: masked.maskedText.slice(0, 1000),
+      textLength: extraction.text.length,
       piiStatistics: masked.statistics,
+      documentExtraction: toDocumentExtractionSummary(extraction),
       analysis,
       financialMetrics,
       financialMetricsError,
       ...(analysisError ? { analysisError } : {}),
-      // TODO: remove rawText from response before production
-      _dev_rawText: parsed.text,
-      _dev_maskedText: masked.maskedText,
+      // Raw/masked text previews (native or OCR-derived) are a
+      // development-only aid — the frontend never reads these fields, and
+      // they must never reach production, since this is unmasked customer
+      // contract content either way.
+      ...(isProduction
+        ? {}
+        : {
+            textPreview: extraction.text.slice(0, 1000),
+            maskedTextPreview: masked.maskedText.slice(0, 1000),
+            _dev_rawText: extraction.text,
+            _dev_maskedText: masked.maskedText,
+            _dev_recoveredFinancialValues: extraction.recoveredFinancialValues,
+          }),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "An unexpected error occurred";
-    res.status(422).json({ success: false, message });
+    res.status(422).json({
+      success: false,
+      message,
+      ...(err instanceof DocumentOcrError ? { code: err.code } : {}),
+    });
   }
 }
 

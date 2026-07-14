@@ -183,7 +183,7 @@ export function calculateFinancialMetrics(
     penalties.totalKnownPenalties,
     exposure.upfrontExposure,
     balloonPaymentAmount,
-    totalCost.calculatedKnownCost,
+    totalCost.financingCost,
     recurringCommitment.monthlyEquivalent,
     monthlyIncome,
   );

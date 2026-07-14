@@ -23,6 +23,61 @@ const LANGUAGE_NAME: Record<AnalysisLanguage, string> = {
   en: "English",
 };
 
+/**
+ * Structurally mirrors `@workspace/document-ocr`'s `RecoveredFinancialValue`
+ * (deliberately not imported from that package — contract-analysis has no
+ * other dependency on document-ocr, and this prompt-building code only
+ * needs the shape, not the package). Callers (api-server) pass the document
+ * extraction's own recovered values directly; TypeScript's structural typing
+ * accepts them without any conversion.
+ */
+export interface DeterministicRecoveryNote {
+  field: string;
+  value: number | null;
+  unit: string;
+  status: "direct" | "recovered" | "ambiguous" | "missing";
+  confidence: "high" | "medium" | "low";
+  source: string;
+  evidence: string[];
+}
+
+/**
+ * Renders a "DETERMINISTIC OCR RECOVERY NOTES" block for values a
+ * deterministic (non-AI) recovery pass already resolved from corrupted OCR
+ * digits — e.g. reading "0 ريال (مائة وعشرون ألف ريال)" as 120,000 from the
+ * parenthetical amount-in-words. Only `direct`/`recovered` values with a
+ * non-null number are listed; `ambiguous`/`missing` fields say nothing
+ * useful (the model's own "never invent" instructions already cover them)
+ * and are omitted to avoid noise. Returns `null` when there is nothing to
+ * report, so the prompt stays exactly as before for documents where this
+ * recovery pass never found anything (the common case — most contracts
+ * either extract cleanly or have no tracked financial label at all).
+ */
+function buildRecoveryNotesSection(notes: readonly DeterministicRecoveryNote[] | undefined): string | null {
+  if (!notes || notes.length === 0) {
+    return null;
+  }
+  const usable = notes.filter((note) => (note.status === "direct" || note.status === "recovered") && note.value !== null);
+  if (usable.length === 0) {
+    return null;
+  }
+
+  const lines = usable.map((note) => {
+    const evidence = note.evidence.length > 0 ? note.evidence.join("; ") : "no further evidence recorded";
+    return `- ${note.field}: ${note.value} ${note.unit} (confidence: ${note.confidence}, source: ${note.source}) — ${evidence}`;
+  });
+
+  return `DETERMINISTIC OCR RECOVERY NOTES (machine-generated, NOT part of the contract itself):
+A deterministic, non-AI text-recovery pass identified the following financial values from OCR text that had corrupted digits, using evidence such as an amount spelled out in words, a repeated installment-table figure, or arithmetic consistency between related values — never a guess:
+${lines.join("\n")}
+
+How to use these notes:
+- Prefer what you can read directly and reliably in the masked contract text below over these notes — these notes exist only to help when the OCR digits for a field are genuinely unclear or contradictory.
+- Only use a note's value when you cannot otherwise confidently read that field, and only trust "confidence: high" notes; treat "confidence: medium"/"low" as a hint to look more carefully at the text, not as a value to copy in directly.
+- These notes are recovery hints, not verified facts. If a note conflicts with what the masked text otherwise shows, or you are not confident, follow your normal rule: use null rather than guessing.
+- Never use these notes to fill in a field they do not mention — the absence of a field here is not evidence of anything.`;
+}
+
 function buildAnalysisLanguageInstruction(analysisLanguage: AnalysisLanguage): string {
   const languageName = LANGUAGE_NAME[analysisLanguage];
   const fieldList = USER_FACING_GENERATED_FIELDS.map((field) => `"${field}"`).join(", ");
@@ -60,13 +115,15 @@ export function buildAnalysisPrompt(
   maskedText: string,
   contractType: ContractType,
   analysisLanguage: AnalysisLanguage,
+  recoveryNotes?: readonly DeterministicRecoveryNote[],
 ): string {
   const label = CONTRACT_TYPE_LABELS_EN[contractType];
+  const recoveryNotesSection = buildRecoveryNotesSection(recoveryNotes);
 
   return `The contract type you must use for this analysis is: "${contractType}" (${label}).
 
 ${buildAnalysisLanguageInstruction(analysisLanguage)}
-
+${recoveryNotesSection ? `\n${recoveryNotesSection}\n` : ""}
 Analyze the following masked contract text and extract a structured contract understanding result that matches the required JSON schema exactly.
 
 Masked contract text:
@@ -81,6 +138,7 @@ export interface CorrectionPromptInput {
   analysisLanguage: AnalysisLanguage;
   previousResponseText: string;
   validationErrorSummary: string;
+  recoveryNotes?: readonly DeterministicRecoveryNote[];
 }
 
 const MAX_PREVIOUS_RESPONSE_CHARS = 4000;
@@ -90,6 +148,7 @@ export function buildCorrectionPrompt(input: CorrectionPromptInput): string {
     input.previousResponseText.length > MAX_PREVIOUS_RESPONSE_CHARS
       ? `${input.previousResponseText.slice(0, MAX_PREVIOUS_RESPONSE_CHARS)}...(truncated)`
       : input.previousResponseText;
+  const recoveryNotesSection = buildRecoveryNotesSection(input.recoveryNotes);
 
   return `Your previous response for contract type "${input.contractType}" was not valid.
 
@@ -102,7 +161,7 @@ Validation problems that must be fixed:
 ${input.validationErrorSummary}
 
 The masked contract text is still the ONLY source of truth for this correction — it has not changed since your previous response. Do not claim it is missing.
-
+${recoveryNotesSection ? `\n${recoveryNotesSection}\n` : ""}
 Masked contract text:
 """
 ${input.maskedText}

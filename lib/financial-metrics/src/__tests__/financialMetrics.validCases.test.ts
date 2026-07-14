@@ -50,6 +50,8 @@ function baseFinancialMetrics() {
       calculatedBaseCost: unavailableMoney("insufficient data to calculate"),
       calculatedCoreObligations: unavailableMoney("insufficient data to calculate"),
       calculatedKnownCost: unavailableMoney("insufficient data to calculate"),
+      financingRepaymentTotal: unavailableMoney("insufficient data to calculate"),
+      financingCost: unavailableMoney("insufficient data to calculate"),
       estimatedContractCost: unavailableMoney("insufficient data to calculate"),
       differenceFromStated: {
         classification: "unavailable" as const,
@@ -284,6 +286,8 @@ export function run(): void {
       calculatedBaseCost: knownMoney(11800, "SAR"),
       calculatedCoreObligations: knownMoney(11800, "SAR"),
       calculatedKnownCost: knownMoney(11950, "SAR"),
+      financingRepaymentTotal: unavailableMoney("no financed principal was found"),
+      financingCost: unavailableMoney("no financed principal was found"),
       estimatedContractCost: knownMoney(12000, "SAR"),
       differenceFromStated: {
         classification: "rounding" as const,

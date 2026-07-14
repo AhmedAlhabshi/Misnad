@@ -13,6 +13,14 @@ function App() {
   const [pendingUpload, setPendingUpload] = useState<PendingUpload | null>(null);
   const [analysisResult, setAnalysisResult] = useState<StoredAnalysisResult | null>(null);
 
+  // Starting a new upload discards the previous result (analysis and
+  // financial metrics together) so a stale result can never be shown
+  // alongside a new in-progress analysis.
+  function handleStartAnalysis(upload: PendingUpload) {
+    setAnalysisResult(null);
+    setPendingUpload(upload);
+  }
+
   useEffect(() => {
     document.documentElement.classList.add("dark");
     document.documentElement.setAttribute("dir", "rtl");
@@ -23,7 +31,7 @@ function App() {
       <div className="min-h-[100dvh] w-full max-w-[480px] mx-auto relative overflow-hidden bg-[#0D1117] text-white selection:bg-indigo-500/30">
         <AnimatePresence mode="wait">
           {currentScreen === "home" && (
-            <HomeScreen key="home" onNavigate={setCurrentScreen} onStartAnalysis={setPendingUpload} />
+            <HomeScreen key="home" onNavigate={setCurrentScreen} onStartAnalysis={handleStartAnalysis} />
           )}
           {currentScreen === "loading" && (
             <LoadingScreen

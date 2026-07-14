@@ -168,8 +168,22 @@ export function run(): void {
   assert.equal(result.exposure.totalsByCurrency[0]?.currency, "SAR");
   assert.equal(result.exposure.totalsByCurrency[0]?.value, 169000);
 
-  // 15. totalCostIncrease equals 40.83.
-  assert.equal(result.ratios.totalCostIncrease.value, 40.83);
+  // 15. Milestone 5.6C correction: `totalCostIncrease` previously computed
+  // (calculatedKnownCost - principal) / principal = (169000 - 120000) /
+  // 120000 = 40.83% — this mixed the 30,000 SAR down payment (a
+  // pre-financing amount that reduces what needed to be financed, not a
+  // financing-repayment amount) into what was meant to be a "how much did
+  // financing cost" ratio, overstating it by exactly the down payment's
+  // share. The correct financing-only comparison is
+  // financingRepaymentTotal (2,300 × 60 months = 138,000, no balloon in this
+  // fixture) vs. the 120,000 principal: financingCost = 18,000, and
+  // totalCostIncrease = 18,000 / 120,000 = 15%. calculatedCoreObligations
+  // (169,000, assertion #10 above) is unchanged and still correctly
+  // represents total guaranteed cash outflow including the down payment —
+  // only the ratio's input changed, not that total's own value.
+  assert.equal(result.totalCost.financingRepaymentTotal.value, 138000);
+  assert.equal(result.totalCost.financingCost.value, 18000);
+  assert.equal(result.ratios.totalCostIncrease.value, 15);
 
   // 16. No duplicate English/Arabic obligations remain.
   assert.equal(result.paymentObligations.length, 2, "only the down payment and the monthly installment survive as obligations");

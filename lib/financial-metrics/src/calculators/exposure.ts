@@ -45,12 +45,20 @@ export function calculateExposure(
   obligationRefundability: ReadonlyMap<string, boolean | null>,
   totalScheduledRecurring: MoneyMetric,
 ): { result: Exposure; metadata: CalculatorMetadata } {
+  // A balloon/final payment is financing repayment, not an upfront (pre-
+  // financing) cash requirement — excluding it here mirrors the same
+  // financial-scope split `costs.ts` applies to `financingRepaymentTotal`,
+  // so `upfrontExposure`/`ratios.upfrontPaymentToBaseCost` are never
+  // inflated by a loan's final repayment.
   const upfrontObligationAmounts = obligations
-    .filter((obligation) => obligation.mandatory === true && obligation.frequency === "one_time")
+    .filter(
+      (obligation) =>
+        obligation.mandatory === true && obligation.frequency === "one_time" && obligation.type !== "balloon_payment",
+    )
     .map((obligation) => obligation.amount);
   const upfrontExposure = sumKnownMoneyMetrics(
     [...upfrontObligationAmounts, fees.upfrontFees],
-    "sum of mandatory upfront obligations and upfront fees",
+    "sum of mandatory upfront (pre-financing) obligations and upfront fees",
     "no upfront obligation or fee has a fully known amount",
   );
 

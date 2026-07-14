@@ -37,3 +37,20 @@ export function progressStageLabel(
  * server actually responds.
  */
 export const MAX_AUTO_COMPLETED_STAGES = ANALYSIS_PROGRESS_STAGES.length - 1;
+
+/**
+ * Extra stages shown only when the request is still pending after the
+ * normal (native-text) stage sequence would already have finished — this is
+ * an honest, non-fabricated signal: a scanned PDF genuinely takes
+ * noticeably longer (rendering pages + running OCR) than a native-text PDF,
+ * so still waiting past that point is real evidence OCR is likely running.
+ * The backend still returns one final response — these never claim an
+ * exact percentage or guarantee OCR is in progress, they only reflect that
+ * the wait has gone on long enough to plausibly be OCR.
+ */
+export const OCR_PROGRESS_STAGES: readonly ProgressStageDefinition[] = [
+  { labelAr: "جاري فحص جودة النص", labelEn: "Checking text quality" },
+  { labelAr: "جاري تحويل صفحات العقد", labelEn: "Rendering contract pages" },
+  { labelAr: "جاري قراءة العقد المصور", labelEn: "Reading the scanned contract" },
+  { labelAr: "جاري تجهيز النص", labelEn: "Preparing the text" },
+];
