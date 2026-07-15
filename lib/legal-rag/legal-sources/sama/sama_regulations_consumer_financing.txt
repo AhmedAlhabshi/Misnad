@@ -1,0 +1,49 @@
+Regulations for Consumer Financing
+Saudi Central Bank (SAMA)
+Regulation Number: 351000116619
+Date: 7/7/2014 (10/9/1435H)
+Status: In-Force
+Official source: https://rulebook.sama.gov.sa/en/regulations-consumer-financing
+
+Section Two - Financing Contracts and Guarantee Agreements
+
+Article 9: Fees and Charges
+
+All fees, costs and administrative services charges to be recovered from the Borrower by the Creditor must not exceed the equivalent of (1%) of the Amount of Financing or (5,000) five thousand Saudi riyals, whichever is lower.
+
+Article 11: Early Payments
+
+1. A Creditor must accept any payment under a Financing Contract before its due date as partial payment if it is equivalent to one full installment or multiples thereof.
+
+2. A Creditor must credit each payment made under a Financing Contract to the Borrower's account promptly after receipt of such payment.
+
+3. The Borrower may prepay, at any time, the remaining Amount of Financing without incurring any Term Cost for the remaining period. The Creditor is entitled to compensation from the Borrower for the following:
+   a. The cost of re-investment, which may not exceed the Term Cost for the three months following the payment, calculated on the basis of a declining balance; and
+   b. The expenses the Creditor pays to a third party as a consequence of the Financing Contract for the remaining period of the Consumer Financing if such expenses are unrecoverable, and provided that such expenses are properly recorded in the Borrower's Financing file.
+
+4. The Creditor must notify the Borrower in writing of all such fees payable by the Borrower as referenced under Art. 11(3)(a) and (b) above. The Creditor must give that notification by Guaranteed Communication Means within 10 Business Days after the first to occur of:
+   a. Receipt by the Creditor of a notice from the Borrower of the intended prepayment; or
+   b. Receipt by the Creditor of the prepayment.
+
+Section Five Rules of Information Disclosure
+
+Article 21: Initial Disclosure - Content
+
+A creditor entering a financing contract must provide borrowers with an initial disclosure statement containing:
+
+- The initial limit of the Financing, if it is known at the time the disclosure is made.
+- The APR and annual term cost.
+- Nature and amounts of recurring non-term charges.
+- Minimum payment amounts and the method of determining them.
+- Account statement periods.
+- The term cost accrual date.
+- Details of all charges and administrative fees.
+- Information on optional features, their costs, and cancellation conditions.
+- The term cost calculation methodology.
+- Applicable charges including credit bureau reporting details.
+
+If the financing limit is unknown at the time the initial disclosure is made, it must be disclosed in the first account statement or in a separate statement provided before that statement's delivery.
+
+Amendments to the terms disclosed above must be disclosed in writing at least 30 calendar days before they take effect, except for a decrease in charges or a change to an optional feature.
+
+Where a payment deferral is offered, the disclosure must clearly indicate whether term costs continue to accrue during the deferral period, and the maximum deferral term must not exceed 5 years.

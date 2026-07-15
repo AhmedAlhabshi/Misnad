@@ -29,6 +29,9 @@
     },
     {
       "path": "../../lib/financial-metrics"
+    },
+    {
+      "path": "../../lib/legal-rag"
     }
   ]
 }

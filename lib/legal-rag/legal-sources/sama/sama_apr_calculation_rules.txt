@@ -1,0 +1,14 @@
+Rules Governing Calculation of Annual Percentage Rate (APR)
+Saudi Central Bank (SAMA)
+Circular Number: 45025707
+Date: 31/10/2023 (17/4/1445H)
+Status: In-Force
+Official source: https://rulebook.sama.gov.sa/en/rules-governing-calculation-annual-percentage-rate-apr-0
+
+The objective of these Rules is to standardize the Annual Percentage Rate (APR) calculation for different types of retail lending, ensuring transparency in the finance offers and comparability to enable retail consumers to make informed decisions.
+
+The Annual Percentage Rate (APR) is defined as the discount rate at which the present value of payments and installments that are due from the borrower representing the total amount payable by the borrower equals the present value of all payments of the amount of financing available to the borrower on the date on which the financing amount or the first payment thereof is available to the borrower.
+
+Article 6: APR Calculation Method
+
+The APR should be calculated based on the net present value method. Periods between the date on which the amount of finance or the first payment is available to the borrower and the date of each payment received or payable by the borrower shall be calculated on the basis of 365 days a year. The APR must be calculated and expressed in percentage points with a minimum of two basis points, rounding half basis points to the nearest full basis points. Finance providers shall utilize the Excel-based calculator issued by SAMA for the purpose of implementing these Rules.

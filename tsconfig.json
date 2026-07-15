@@ -22,6 +22,9 @@
       "path": "./lib/db"
     },
     {
+      "path": "./lib/legal-rag"
+    },
+    {
       "path": "./lib/api-client-react"
     },
     {
