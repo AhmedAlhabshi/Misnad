@@ -21,6 +21,7 @@ function candidate(overrides: Partial<Candidate>): Candidate {
     mandatory: true,
     conditional: null,
     refundable: null,
+    paymentTiming: null,
     calculationBase: null,
     trigger: null,
     sourceKind: "financial_obligation",
@@ -187,6 +188,38 @@ export function run(): void {
     const notBackfilled = backfillCandidateCurrencies([typeDetailsAmount], null);
     assert.equal(notBackfilled[0].currency, null, "no contract currency means nothing is fabricated");
   }
+
+  // A contract can legitimately state more than one distinct grand total
+  // (e.g. "Total of Payments" vs "Total repayment amount") — these must
+  // never be treated as conflicting reports of the same figure and
+  // collapsed to one, unlike a genuinely singular special value (principal,
+  // credit limit, ...).
+  {
+    const totalOfPayments = candidate({
+      targetKind: "special",
+      specialKey: "statedTotalCost",
+      label: "Total of Payments during the financing term",
+      amountValue: 115200,
+      sourceField: "financialObligations[0]",
+    });
+    const totalRepayment = candidate({
+      targetKind: "special",
+      specialKey: "statedTotalCost",
+      label: "Total repayment amount",
+      amountValue: 134400,
+      sourceField: "financialObligations[1]",
+    });
+    const { candidates, conflicts } = resolveConflicts([totalOfPayments, totalRepayment]);
+    assert.equal(candidates.length, 2, "two distinct stated totals must both survive, never collapsed into one");
+    assert.equal(conflicts.length, 0, "two genuinely different stated totals are not a conflict");
+
+    // A genuinely singular special value (principal) still collapses as before.
+    const principalA = candidate({ targetKind: "special", specialKey: "principal", label: "Financed amount", amountValue: 96000, sourceField: "typeDetails.financedAmount" });
+    const principalB = candidate({ targetKind: "special", specialKey: "principal", label: "Amount financed", amountValue: 95000, sourceField: "financialObligations[2]" });
+    const principalResult = resolveConflicts([principalA, principalB]);
+    assert.equal(principalResult.candidates.length, 1, "a genuinely singular special value like principal must still resolve to one winner");
+  }
+  console.log("PASS statedTotalCost allows multiple distinct stated totals; other special values remain singular");
 
   console.log("PASS pipeline.conflicts.test.ts");
 }

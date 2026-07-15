@@ -4,6 +4,8 @@ import { validateContractUnderstanding } from "../validate";
 function baseCandidate(overrides: Record<string, unknown> = {}) {
   return {
     contractType: "other",
+    contractSummary: "Contract summary.",
+    contractSummarySimple: "Simple contract summary.",
     parties: [],
     financialObligations: [],
     dates: [],
@@ -43,17 +45,33 @@ export function run(): void {
   );
 
   const tooManyClauses = baseCandidate({
-    importantClauses: repeat(11, (i) => ({
+    importantClauses: repeat(31, (i) => ({
       title: `Clause ${i}`,
       summary: "Summary text",
       riskLevel: null,
       evidence: null,
+      plainExplanation: "Plain explanation.",
     })),
   });
   assert.equal(
     validateContractUnderstanding(tooManyClauses, "masked text").success,
     false,
-    "more than 10 importantClauses must be rejected",
+    "more than 30 importantClauses must be rejected",
+  );
+
+  const atMaxClauses = baseCandidate({
+    importantClauses: repeat(30, (i) => ({
+      title: `Clause ${i}`,
+      summary: "Summary text",
+      riskLevel: null,
+      evidence: null,
+      plainExplanation: "Plain explanation.",
+    })),
+  });
+  assert.equal(
+    validateContractUnderstanding(atMaxClauses, "masked text").success,
+    true,
+    "exactly 30 importantClauses (the configured maximum) must be accepted",
   );
 
   const tooManyExtractedNumbers = baseCandidate({
@@ -92,7 +110,9 @@ export function run(): void {
   // b. Overly long text fields are rejected, even when otherwise valid.
   const longEvidence = "x".repeat(351);
   const overLongEvidence = baseCandidate({
-    importantClauses: [{ title: "Title", summary: "Summary", riskLevel: null, evidence: longEvidence }],
+    importantClauses: [
+      { title: "Title", summary: "Summary", riskLevel: null, evidence: longEvidence, plainExplanation: "Plain explanation." },
+    ],
   });
   // maskedText contains the excerpt verbatim, so only the length limit
   // (not substring-integrity) is what must cause this to fail.
@@ -103,12 +123,46 @@ export function run(): void {
   );
 
   const overLongSummary = baseCandidate({
-    importantClauses: [{ title: "Title", summary: "s".repeat(501), riskLevel: null, evidence: null }],
+    importantClauses: [
+      { title: "Title", summary: "s".repeat(501), riskLevel: null, evidence: null, plainExplanation: "Plain explanation." },
+    ],
   });
   assert.equal(
     validateContractUnderstanding(overLongSummary, "masked text").success,
     false,
     "a clause summary longer than 500 characters must be rejected",
+  );
+
+  const overLongPlainExplanation = baseCandidate({
+    importantClauses: [
+      { title: "Title", summary: "Summary", riskLevel: null, evidence: null, plainExplanation: "p".repeat(351) },
+    ],
+  });
+  assert.equal(
+    validateContractUnderstanding(overLongPlainExplanation, "masked text").success,
+    false,
+    "a clause plainExplanation longer than 350 characters must be rejected",
+  );
+
+  const overLongContractSummary = baseCandidate({ contractSummary: "c".repeat(501) });
+  assert.equal(
+    validateContractUnderstanding(overLongContractSummary, "masked text").success,
+    false,
+    "contractSummary longer than 500 characters must be rejected",
+  );
+
+  const overLongContractSummarySimple = baseCandidate({ contractSummarySimple: "c".repeat(351) });
+  assert.equal(
+    validateContractUnderstanding(overLongContractSummarySimple, "masked text").success,
+    false,
+    "contractSummarySimple longer than 350 characters must be rejected",
+  );
+
+  const missingContractSummary = baseCandidate({ contractSummary: undefined });
+  assert.equal(
+    validateContractUnderstanding(missingContractSummary, "masked text").success,
+    false,
+    "contractSummary is required and must be rejected when missing",
   );
 
   const overLongExtractionNotes = baseCandidate({ extractionNotes: "n".repeat(701) });

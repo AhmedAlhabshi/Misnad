@@ -16,6 +16,7 @@ function candidate(overrides: Partial<Candidate>): Candidate {
     mandatory: true,
     conditional: null,
     refundable: null,
+    paymentTiming: null,
     calculationBase: null,
     trigger: null,
     sourceKind: "financial_obligation",

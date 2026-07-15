@@ -19,6 +19,8 @@ function assert(condition: boolean, message: string): void {
 
 const VALID_UNDERSTANDING = {
   contractType: "lease" as const,
+  contractSummary: "Contract summary.",
+  contractSummarySimple: "Simple contract summary.",
   parties: [{ role: "tenant", name: null, identifier: null, notes: null }],
   financialObligations: [],
   dates: [],

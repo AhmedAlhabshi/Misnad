@@ -17,7 +17,7 @@ function repeat<T>(n: number, factory: (index: number) => T): T[] {
  * within a single valid JSON response.
  */
 export async function run(): Promise<void> {
-  const clauseEvidence = repeat(10, (i) => `Clause ${i} supporting sentence from the contract.`);
+  const clauseEvidence = repeat(30, (i) => `Clause ${i} supporting sentence from the contract.`);
   const maskedText = `Masked long template contract, unique-marker-b19d4e. ${clauseEvidence.join(" ")}`;
 
   let callCount = 0;
@@ -28,6 +28,8 @@ export async function run(): Promise<void> {
       return {
         rawText: JSON.stringify({
           contractType: "other",
+          contractSummary: "c".repeat(500),
+          contractSummarySimple: "c".repeat(350),
           parties: repeat(6, (i) => ({
             role: `Role ${i}`,
             name: null,
@@ -54,11 +56,12 @@ export async function run(): Promise<void> {
             currency: "SAR",
             isRecurring: false,
           })),
-          importantClauses: repeat(10, (i) => ({
+          importantClauses: repeat(30, (i) => ({
             title: `Clause ${i}`,
             summary: `Summary of clause ${i}`,
             riskLevel: "medium" as const,
             evidence: clauseEvidence[i],
+            plainExplanation: `Plain explanation of clause ${i}`,
           })),
           extractedNumbers: repeat(20, (i) => ({ label: `Number ${i}`, value: i, unit: null })),
           missingInformation: repeat(15, (i) => ({ field: `field${i}`, reason: null })),
@@ -77,7 +80,7 @@ export async function run(): Promise<void> {
   assert.equal(result.dates.length, 12);
   assert.equal(result.penalties.length, 10);
   assert.equal(result.fees.length, 10);
-  assert.equal(result.importantClauses.length, 10);
+  assert.equal(result.importantClauses.length, 30);
   assert.equal(result.extractedNumbers.length, 20);
   assert.equal(result.missingInformation.length, 15);
   assert.equal(result.extractionNotes?.length, 700);

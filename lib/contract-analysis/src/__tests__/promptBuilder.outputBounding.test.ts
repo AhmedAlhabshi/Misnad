@@ -13,7 +13,7 @@ export function run(): void {
     ["dates", 12],
     ["penalties", 10],
     ["fees", 10],
-    ["importantClauses", 10],
+    ["importantClauses", 30],
     ["extractedNumbers", 20],
     ["missingInformation", 15],
   ];
@@ -29,11 +29,14 @@ export function run(): void {
   );
 
   const textLimits = [
+    '"contractSummary" ≤ 500',
+    '"contractSummarySimple" ≤ 350',
     'role" ≤ 100',
     'notes" ≤ 300',
     "fields ≤ 250",
     'title" ≤ 180',
     'summary" ≤ 500',
+    'plainExplanation" ≤ 350',
     'evidence" ≤ 350',
     'condition" ≤ 600',
     "missingInformation.reason\" ≤ 300",
@@ -82,6 +85,55 @@ export function run(): void {
   assert.ok(
     /always set "evidence" to null for every clause/i.test(SYSTEM_INSTRUCTIONS),
     "the prompt must explicitly instruct setting evidence to null for every clause",
+  );
+
+  // Generic (contract-type-agnostic) content-understanding instructions for
+  // the new contractSummary/contractSummarySimple/plainExplanation fields —
+  // must describe the concept, not any specific contract type's content.
+  assert.ok(
+    /explaining, in plain language, what kind of contractual relationship/i.test(SYSTEM_INSTRUCTIONS),
+    'the prompt must instruct a generic, contract-type-agnostic "contractSummary" explanation',
+  );
+  assert.ok(
+    /not a financial summary/i.test(SYSTEM_INSTRUCTIONS),
+    "the prompt must explicitly forbid a financial-dashboard framing for contractSummary",
+  );
+  assert.ok(
+    /simplest possible everyday language/i.test(SYSTEM_INSTRUCTIONS),
+    'the prompt must instruct "contractSummarySimple" to use the simplest everyday language',
+  );
+  assert.ok(
+    /"plainExplanation" must explain the practical, everyday meaning/i.test(SYSTEM_INSTRUCTIONS),
+    'the prompt must instruct a per-clause "plainExplanation" distinct from "summary"',
+  );
+  assert.ok(
+    /not a repeat of "summary"/i.test(SYSTEM_INSTRUCTIONS),
+    'the prompt must explicitly forbid "plainExplanation" from repeating "summary"',
+  );
+  // These instructions must not bake in a worked example sentence for any one contract type.
+  for (const workedExample of ["auto finance", "vehicle ownership", "financing agreement", "هذا عقد تمويل"]) {
+    assert.equal(
+      SYSTEM_INSTRUCTIONS.toLowerCase().includes(workedExample.toLowerCase()),
+      false,
+      `the generic contractSummary/plainExplanation instructions must not bake in a worked example like "${workedExample}"`,
+    );
+  }
+
+  // The Overview tab must show every meaningful clause, not a curated
+  // subset — the prompt must instruct full, generic coverage (never a fixed
+  // hardcoded category checklist) and explicitly forbid artificially
+  // limiting to a small "top" handful when more genuinely exist.
+  assert.ok(
+    /"importantClauses" must include EVERY distinct clause actually present/i.test(SYSTEM_INSTRUCTIONS),
+    "the prompt must instruct exhaustive, generic clause coverage",
+  );
+  assert.ok(
+    /do not artificially limit yourself to a small handful of "top" clauses/i.test(SYSTEM_INSTRUCTIONS),
+    "the prompt must explicitly forbid artificially limiting clause coverage",
+  );
+  assert.ok(
+    /only illustrative examples, not a fixed checklist/i.test(SYSTEM_INSTRUCTIONS),
+    "the prompt must clarify the example clause types are illustrative, not a hardcoded category list",
   );
 
   // Correction prompt: completion-priority instructions.

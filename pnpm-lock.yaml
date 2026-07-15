@@ -416,6 +416,9 @@ importers:
       next-themes:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      pdfjs-dist:
+        specifier: 6.1.200
+        version: 6.1.200
       react:
         specifier: 'catalog:'
         version: 19.1.0

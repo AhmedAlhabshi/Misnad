@@ -120,6 +120,7 @@ const ROLES_NOT_ELIGIBLE_AS_PAYMENT_OBLIGATIONS: ReadonlySet<CandidateSemanticRo
   "scenario_balance",
   "scenario_payment",
   "credit_limit",
+  "coverage_limit",
   "income",
 ]);
 

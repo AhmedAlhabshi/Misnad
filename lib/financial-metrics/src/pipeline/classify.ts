@@ -99,19 +99,23 @@ const MANDATORY_KEYWORDS = ["mandatory", "required", "must pay", "إلزامي",
 const OPTIONAL_KEYWORDS = ["optional", "voluntary", "if elected", "اختياري"];
 
 /**
- * A plain declarative statement that a fee/amount *is* paid (no "if you
- * choose", no optional/conditional trigger) — e.g. "an administrative fee
- * of 1,000 SAR is paid after contract execution" — never says "mandatory"
- * literally, but leaves no room for the customer to avoid it. Only used as
- * a fallback signal, and only when no conditional trigger wording is also
- * present (see `inferMandatoryFromText`).
+ * Returns `true`/`false` when the text explicitly signals it. Otherwise —
+ * the ambiguous middle case, e.g. a plainly-worded "Administrative fee:
+ * 1,200 SAR" with no "mandatory"/"is paid"/"optional" verb at all — defaults
+ * to `true` rather than `null`, as long as no conditional/optional/event
+ * trigger keyword is present. This matters: a candidate extracted from the
+ * contract as a real, named fee or obligation line item overwhelmingly is a
+ * real, guaranteed cost; treating "no explicit verb" as "silently exclude
+ * from every cost total" (the previous behavior) was a bug, not a safe
+ * default — it caused legitimately mandatory fees to vanish from
+ * `calculatedKnownCost`/`exposure`/ratios engine-wide. Text that already
+ * reads as conditional/optional (`CONDITIONAL_KEYWORDS`/`OPTIONAL_KEYWORDS`)
+ * still resolves to `false`/`null` here, and is separately marked
+ * `conditional: true` by `inferConditionalFromText` — the `isGuaranteed`
+ * eligibility gate excludes those regardless of what `mandatory` resolves
+ * to, so this default change never reclassifies a genuinely conditional,
+ * optional, or refundable item as a guaranteed cost.
  */
-const EXPLICIT_PAYMENT_KEYWORDS = [
-  "is paid", "shall be paid", "will be paid", "paid after", "must be paid", "is payable", "is charged",
-  "يُدفع", "تُدفع", "يتم دفعه", "تُسدد", "تدفع", "يستوفى", "تُستوفى",
-];
-
-/** Returns `true`/`false` only when the text explicitly signals it; `null` when genuinely unstated. */
 export function inferMandatoryFromText(...texts: Array<string | null | undefined>): boolean | null {
   const combined = texts.filter((text): text is string => typeof text === "string").join(" ");
   if (containsAnyKeyword(combined, MANDATORY_KEYWORDS)) {
@@ -120,21 +124,83 @@ export function inferMandatoryFromText(...texts: Array<string | null | undefined
   if (containsAnyKeyword(combined, OPTIONAL_KEYWORDS)) {
     return false;
   }
-  if (containsAnyKeyword(combined, EXPLICIT_PAYMENT_KEYWORDS) && !containsAnyKeyword(combined, CONDITIONAL_KEYWORDS)) {
-    return true;
+  if (containsAnyKeyword(combined, CONDITIONAL_KEYWORDS)) {
+    return null;
   }
-  return null;
+  return true;
 }
 
 const CONDITIONAL_KEYWORDS = [
-  "if", "in case", "should", "upon", "unless", "penalty", "late", "default", "cancellation",
-  "إذا", "في حال", "عند", "غرامة", "تأخير",
+  "if", "in case", "should", "unless", "penalty", "late", "default", "cancellation",
+  "early termination", "termination fee", "may apply", "in the event of",
+  // Generic applicability/conditionality phrasing — not tied to any one
+  // contract type or trigger event. A fact worded this way (e.g. "actual
+  // collection costs, up to SAR 500, when applicable") is describing a
+  // potential/variable cost, not a fixed guaranteed one, even without an
+  // explicit "if"/"penalty" style trigger word.
+  "when applicable", "as applicable", "if applicable", "where applicable",
+  "as needed", "when necessary", "subject to", "contingent on", "contingent upon", "depending on",
+  // Cap/maximum/minimum/range phrasing on its own also signals a variable,
+  // non-fixed amount — a stated ceiling is not a guaranteed exact payment.
+  "capped at", "up to a maximum", "not to exceed", "no more than", "up to",
+  "إذا", "في حال", "غرامة", "تأخير", "إنهاء مبكر", "إنهاء العقد",
+  "عند الاقتضاء", "حسب الحالة", "عند الحاجة", "حسب الحاجة", "بحسب الحاجة",
+  "بحد أقصى", "لا يتجاوز", "حتى",
 ];
 
 /** Returns `true` only when the text explicitly signals a future/triggered condition; `null` when unstated. */
 export function inferConditionalFromText(...texts: Array<string | null | undefined>): boolean | null {
   const combined = texts.filter((text): text is string => typeof text === "string").join(" ");
   return containsAnyKeyword(combined, CONDITIONAL_KEYWORDS) ? true : null;
+}
+
+export type PaymentTiming = "due_now" | "due_later";
+
+/**
+ * Explicit signal that a one-time amount is due immediately/at contract
+ * start (down payments, signing/admin fees, brokerage fees, initial
+ * premiums, activation/setup fees, ...) rather than at some later point
+ * (a renewal fee, a final/balloon payment, a fee due upon a future event).
+ * Checked ahead of `DUE_NOW_KEYWORDS` so a phrase that names a future event
+ * (e.g. "final payment due at the end of the term") is never misread as
+ * due-now just because it also mentions "due". When neither list matches,
+ * timing is genuinely unstated — callers must never assume "due now" for
+ * unstated timing, only for an explicit signal.
+ */
+const DUE_LATER_KEYWORDS = [
+  "at the end of the term", "at the end of the contract", "at the end of the lease",
+  "upon renewal", "at renewal", "after the first year", "at maturity", "upon expiry",
+  "at contract end", "final payment", "balloon payment", "residual value",
+  "عند انتهاء العقد", "عند نهاية العقد", "عند التجديد", "بعد السنة الأولى",
+  "في نهاية المدة", "الدفعة الختامية", "الدفعة الأخيرة", "القيمة المتبقية",
+];
+
+const DUE_NOW_KEYWORDS = [
+  "at signing", "upon signing", "at the signing", "at contract signing",
+  "at contract start", "at the start of the contract", "due at signing",
+  "payable at signing", "due now", "immediately due", "due immediately",
+  "at closing", "at inception", "upon execution", "at activation", "upon activation",
+  "at policy start", "upon policy issuance", "at the outset",
+  "عند التوقيع", "عند توقيع العقد", "عند بدء العقد", "عند إبرام العقد",
+  "فور التوقيع", "عند التفعيل", "عند بداية العقد", "عند إصدار الوثيقة", "عند بدء التغطية",
+];
+
+/**
+ * Distinguishes a one-time amount confirmed due now (at signing/contract
+ * start) from one confirmed due later, using only explicit timing wording —
+ * never inferred from fee type, obligation type, or amount. Returns `null`
+ * when the text states neither, which callers must treat as "timing
+ * unknown" (excluded from any "due now" total), not as a default "due now".
+ */
+export function inferPaymentTimingFromText(...texts: Array<string | null | undefined>): PaymentTiming | null {
+  const combined = texts.filter((text): text is string => typeof text === "string").join(" ");
+  if (containsAnyKeyword(combined, DUE_LATER_KEYWORDS)) {
+    return "due_later";
+  }
+  if (containsAnyKeyword(combined, DUE_NOW_KEYWORDS)) {
+    return "due_now";
+  }
+  return null;
 }
 
 const REFUNDABLE_KEYWORDS = ["refundable", "returned at the end", "قابل للاسترداد", "يسترد"];
@@ -154,7 +220,8 @@ export function inferRefundableFromText(...texts: Array<string | null | undefine
 
 const TOTAL_COST_KEYWORDS = [
   "total cost", "total amount", "total repayment", "total payable", "grand total",
-  "إجمالي التكلفة", "المبلغ الإجمالي", "إجمالي المبلغ",
+  "total of payments", "total payments", "total installments", "total instalments",
+  "إجمالي التكلفة", "المبلغ الإجمالي", "إجمالي المبلغ", "إجمالي الدفعات", "إجمالي الأقساط",
 ];
 
 export function isStatedTotalCostText(...texts: Array<string | null | undefined>): boolean {
@@ -181,8 +248,14 @@ export function looksLikeDurationUnitText(unit: string | null | undefined): bool
 }
 
 const ASSET_VALUE_KEYWORDS = [
+  // Generic reference/collateral-value phrasing — applies to a vehicle, a
+  // property, equipment, or any other asset a contract describes a value
+  // for, across every contract type, not just auto-finance.
   "vehicle value", "asset value", "vehicle price", "purchase price", "asset price",
+  "cash price", "list price", "sale price", "contract price", "sticker price", "market value",
+  "property value", "cash value", "insured value", "sum insured", "stated value", "declared value",
   "قيمة المركبة", "سعر المركبة", "قيمة العقار", "سعر الشراء", "قيمة الأصل",
+  "السعر النقدي", "سعر البيع", "القيمة السوقية", "القيمة النقدية", "المبلغ المؤمن عليه",
 ];
 
 /** True when the text describes a reference/collateral value (e.g. a vehicle's or property's value) — never itself a payment the customer owes. */

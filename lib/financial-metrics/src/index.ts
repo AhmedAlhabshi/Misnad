@@ -7,6 +7,7 @@ export * from "./paymentObligation";
 export * from "./contractDuration";
 export * from "./recurringCommitment";
 export * from "./fee";
+export * from "./informationalAmount";
 export * from "./penalty";
 export * from "./totalCost";
 export * from "./ratios";

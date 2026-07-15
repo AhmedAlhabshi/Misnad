@@ -30,6 +30,8 @@ const REAL_WORLD_CORRUPTED_OCR_TEXT = `
 
 const FAKE_ANALYSIS_RESULT: ContractUnderstanding = {
   contractType: "auto_finance",
+  contractSummary: "Contract summary.",
+  contractSummarySimple: "Simple contract summary.",
   parties: [],
   financialObligations: [],
   dates: [],

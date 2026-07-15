@@ -25,6 +25,8 @@ export async function run(): Promise<void> {
       return {
         rawText: JSON.stringify({
           contractType: "other",
+          contractSummary: "Contract summary.",
+          contractSummarySimple: "Simple contract summary.",
           parties: [],
           financialObligations: [],
           dates: [],

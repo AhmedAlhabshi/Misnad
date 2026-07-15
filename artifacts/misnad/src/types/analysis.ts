@@ -48,6 +48,8 @@ export interface ImportantClause {
    * altered in the UI. Null when no reliable excerpt exists.
    */
   evidence: string | null;
+  /** The practical, plain-language meaning of this clause — distinct from `summary`. */
+  plainExplanation: string;
 }
 
 export interface ExtractedNumberItem {
@@ -66,12 +68,16 @@ export interface MissingInformationItem {
  * Type-specific details. Deliberately loosely typed (rather than a full
  * discriminated union mirroring every contract-schema variant) since the
  * frontend only ever reads individual named fields with runtime type
- * guards before rendering — see lib/fieldLabels.ts and ResultsScreen.tsx.
+ * guards before rendering — see OverviewTab.tsx's contract title builder.
  */
 export type TypeDetails = Record<string, unknown> & { contractType: ContractType };
 
 export interface ContractAnalysisResult {
   contractType: ContractType;
+  /** Plain-language explanation of the contractual relationship — never a financial-dashboard summary. */
+  contractSummary: string;
+  /** The same explanation as `contractSummary`, rewritten in the simplest possible everyday language. */
+  contractSummarySimple: string;
   parties: Party[];
   financialObligations: FinancialObligation[];
   dates: ContractDateItem[];
@@ -145,4 +151,13 @@ export interface StoredAnalysisResult {
   financialMetricsError: FinancialMetricsPublicError | null;
   /** Absent when the backend response didn't include it (older backend) — never assume OCR was or wasn't used in that case. */
   documentExtraction: DocumentExtractionSummary | null;
+  /**
+   * A same-session-only `URL.createObjectURL(file)` for the originally
+   * uploaded PDF, used by the Contract tab's viewer. Never persisted —
+   * created in `LoadingScreen.tsx` right before the result is stored, and
+   * revoked in `App.tsx` when a new upload replaces this result. `null`
+   * when unavailable (e.g. an older stored result, or object URL creation
+   * failed).
+   */
+  contractObjectUrl: string | null;
 }

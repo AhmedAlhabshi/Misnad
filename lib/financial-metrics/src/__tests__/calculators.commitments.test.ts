@@ -15,6 +15,8 @@ function obligation(overrides: Partial<PaymentObligation>): PaymentObligation {
     endDate: null,
     mandatory: true,
     conditional: null,
+    refundable: null,
+    financialRole: "recurring_outflow",
     sourceFields: [],
     ...overrides,
   };

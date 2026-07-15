@@ -15,3 +15,27 @@ export type {
 } from "./providers/types";
 
 export { geminiContractAnalysisProvider } from "./providers/geminiProvider";
+
+export { analyzePersonalizedFinancialImpact } from "./personalizedAnalysisService";
+export type { AnalyzePersonalizedFinancialImpactOptions } from "./personalizedAnalysisService";
+
+export {
+  personalizedAnalysisRequestSchema,
+  personalizedAnalysisResponseSchema,
+  sanitizedClausePayloadSchema,
+  financialConceptPayloadSchema,
+  budgetMetricsPayloadSchema,
+  insightItemSchema,
+  beforeYouSignItemSchema,
+  beforeYouSignTypeSchema,
+} from "./personalizedAnalysisSchema";
+export type {
+  PersonalizedAnalysisRequest,
+  PersonalizedAnalysisResponse,
+  SanitizedClausePayload,
+  FinancialConceptPayload,
+  BudgetMetricsPayload,
+  InsightItem,
+  BeforeYouSignItem,
+  BeforeYouSignType,
+} from "./personalizedAnalysisSchema";

@@ -22,6 +22,8 @@ import type {
 export function baseContractUnderstanding(typeDetails: ContractTypeDetails): ContractUnderstanding {
   return {
     contractType: typeDetails.contractType,
+    contractSummary: "Contract summary.",
+    contractSummarySimple: "Simple contract summary.",
     parties: [],
     financialObligations: [],
     dates: [],

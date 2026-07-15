@@ -27,6 +27,41 @@ const upload = multer({
   },
 });
 
+/** True when every character is within the Latin-1 code range (U+0000–U+00FF) — the only range Busboy's mis-decode can ever produce. */
+function isWithinLatin1Range(value: string): boolean {
+  for (let i = 0; i < value.length; i++) {
+    if (value.charCodeAt(i) > 0xff) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Busboy (multer's multipart parser) decodes the `Content-Disposition:
+ * filename="..."` header as Latin-1 by default, even though browsers
+ * actually send the raw UTF-8 bytes for non-ASCII file names — producing
+ * mojibake for any Arabic (or other non-ASCII) file name. Re-interpreting
+ * those Latin-1 code units as UTF-8 bytes recovers the original text.
+ *
+ * This only ever attempts the re-decode when the name is entirely within
+ * the Latin-1 range, since that is the sole range Busboy's mis-decode can
+ * produce — a name already containing real Unicode characters (e.g.
+ * correctly-decoded Arabic) is left untouched. As a second safety net, the
+ * re-decode is discarded (falling back to the original name) whenever it
+ * would introduce replacement characters that weren't already present —
+ * e.g. a genuinely Western-European Latin-1 name like "café.pdf" is not
+ * valid UTF-8 once re-interpreted, so it is correctly left unchanged.
+ */
+export function decodeUploadedFileName(rawName: string): string {
+  if (!isWithinLatin1Range(rawName)) {
+    return rawName;
+  }
+  const reDecoded = Buffer.from(rawName, "latin1").toString("utf8");
+  const introducedReplacementChars = reDecoded.includes("�") && !rawName.includes("�");
+  return introducedReplacementChars ? rawName : reDecoded;
+}
+
 /** Public, user-safe error shape for a Financial Metrics calculation failure — deliberately not part of the `@workspace/financial-metrics` schema, since this is an API-response-layer concern, not a financial-data concern. */
 export interface FinancialMetricsPublicError {
   code: "FINANCIAL_METRICS_FAILED";
@@ -187,7 +222,7 @@ export async function handleAnalyzeContract(
 
     res.json({
       success: true,
-      fileName: req.file.originalname,
+      fileName: decodeUploadedFileName(req.file.originalname),
       message: "PDF processed and PII masked successfully",
       textLength: extraction.text.length,
       piiStatistics: masked.statistics,

@@ -111,6 +111,17 @@ export default function LoadingScreen({
         clearInterval(interval);
         setCompletedCount(ANALYSIS_PROGRESS_STAGES.length);
 
+        // A same-session-only object URL for the Contract tab's PDF viewer —
+        // never persisted, revoked in App.tsx when this result is replaced by
+        // a new upload. Creation failure (should not happen for a real File)
+        // degrades to null rather than blocking the rest of the result.
+        let contractObjectUrl: string | null = null;
+        try {
+          contractObjectUrl = URL.createObjectURL(pendingUpload!.file);
+        } catch {
+          contractObjectUrl = null;
+        }
+
         const result: StoredAnalysisResult = {
           analysis: body.analysis ?? null,
           selectedContractType: pendingUpload!.contractType,
@@ -120,6 +131,7 @@ export default function LoadingScreen({
           financialMetrics: body.financialMetrics ?? null,
           financialMetricsError: body.financialMetricsError ?? null,
           documentExtraction: body.documentExtraction ?? null,
+          contractObjectUrl,
         };
 
         onAnalysisComplete(result);

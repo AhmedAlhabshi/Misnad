@@ -19,6 +19,7 @@ function feeItem(overrides: Partial<FeeItem>): FeeItem {
     mandatory: true,
     conditional: null,
     refundable: null,
+    financialRole: "one_time_outflow",
     sourceFields: [],
     ...overrides,
   };
@@ -35,6 +36,7 @@ function penaltyItem(overrides: Partial<PenaltyItem>): PenaltyItem {
     trigger: null,
     maximumAmount: unavailableMoney("n/a"),
     conditional: true,
+    financialRole: "conditional_cost",
     sourceFields: [],
     ...overrides,
   };
@@ -52,6 +54,8 @@ function obligation(overrides: Partial<PaymentObligation>): PaymentObligation {
     endDate: null,
     mandatory: true,
     conditional: null,
+    refundable: null,
+    financialRole: "recurring_outflow",
     sourceFields: [],
     ...overrides,
   };

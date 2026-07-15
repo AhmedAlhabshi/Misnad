@@ -4,6 +4,7 @@ import { calculationMetadataSchema } from "./calculationMetadata";
 import { contractDurationSchema } from "./contractDuration";
 import { exposureSchema } from "./exposure";
 import { feeCollectionSchema } from "./fee";
+import { informationalAmountSchema } from "./informationalAmount";
 import { paymentObligationSchema } from "./paymentObligation";
 import { penaltyCollectionSchema } from "./penalty";
 import { positiveFinancialFactorSchema } from "./positiveFinancialFactor";
@@ -19,6 +20,14 @@ export const financialMetricsSchema = z.object({
   schemaVersion: financialMetricsSchemaVersionSchema.default(FINANCIAL_METRICS_SCHEMA_VERSION),
   currency: currencyCodeSchema.nullable(),
   paymentObligations: uniqueIdArray(paymentObligationSchema),
+  /**
+   * Stated informational/reference financial facts (financing principal,
+   * credit/coverage limit, income, a deductible, an outstanding balance, a
+   * stated grand total, or a stated rate/APR) — see `InformationalAmount`.
+   * Never payment obligations; kept separate so a principal can never be
+   * mistaken for an additional amount the user pays.
+   */
+  informationalAmounts: uniqueIdArray(informationalAmountSchema),
   recurringCommitment: recurringCommitmentSchema,
   contractDuration: contractDurationSchema,
   totalCost: totalCostSchema,

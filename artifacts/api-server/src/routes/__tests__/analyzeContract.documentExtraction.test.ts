@@ -32,6 +32,8 @@ function createMockRes(): Response & { statusCode: number; body: unknown } {
 
 const FAKE_ANALYSIS_RESULT: ContractUnderstanding = {
   contractType: "auto_finance",
+  contractSummary: "Contract summary.",
+  contractSummarySimple: "Simple contract summary.",
   parties: [],
   financialObligations: [],
   dates: [],

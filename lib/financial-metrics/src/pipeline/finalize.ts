@@ -1,12 +1,14 @@
 import type { CalculatorMetadata } from "../calculators/metadata";
 import type { FeeItem } from "../fee";
+import type { InformationalAmount, InformationalAmountType } from "../informationalAmount";
 import type { MoneyMetric } from "../moneyMetric";
 import type { PaymentObligation } from "../paymentObligation";
 import type { PenaltyItem } from "../penalty";
 import type { PercentageMetric } from "../percentageMetric";
 import { knownMoney, knownPercentage, unavailableMoney, unavailablePercentage } from "../utils/metricFactories";
-import type { Candidate } from "./candidates";
+import type { Candidate, SpecialValueKey } from "./candidates";
 import { isEligiblePaymentObligation } from "./eligibility";
+import { toFinancialRole } from "./semantics";
 
 /**
  * Converts a resolved candidate's amount into a `MoneyMetric`. An amount
@@ -83,6 +85,8 @@ export function buildPaymentObligations(
     endDate: candidate.endDate,
     mandatory: candidate.mandatory,
     conditional: candidate.conditional,
+    refundable: candidate.refundable,
+    financialRole: toFinancialRole(candidate.semanticRole, candidate.frequency, candidate.refundable, candidate.paymentTiming),
     sourceFields: [candidate.sourceField],
   }));
 }
@@ -117,6 +121,7 @@ export function buildFeeItems(candidates: readonly Candidate[], metadata: Calcul
     mandatory: candidate.mandatory,
     conditional: candidate.conditional,
     refundable: candidate.refundable,
+    financialRole: toFinancialRole(candidate.semanticRole, candidate.frequency, candidate.refundable, candidate.paymentTiming),
     sourceFields: [candidate.sourceField],
   }));
 }
@@ -132,6 +137,64 @@ export function buildPenaltyItems(candidates: readonly Candidate[], metadata: Ca
     trigger: candidate.trigger,
     maximumAmount: unavailableMoney("no maximum amount was stated for this penalty", candidate.sourceField),
     conditional: candidate.conditional ?? true,
+    financialRole: toFinancialRole(candidate.semanticRole, candidate.frequency, candidate.refundable, candidate.paymentTiming),
     sourceFields: [candidate.sourceField],
   }));
+}
+
+/** Internal `SpecialValueKey` (camelCase, extraction-side) → public `InformationalAmountType` (snake_case, stable presentation-facing name). */
+const SPECIAL_KEY_TO_INFORMATIONAL_TYPE: Record<SpecialValueKey, InformationalAmountType> = {
+  principal: "principal",
+  creditLimit: "credit_limit",
+  outstandingBalance: "outstanding_balance",
+  monthlyIncome: "monthly_income",
+  statedTotalCost: "stated_total_cost",
+  insuranceDeductible: "insurance_deductible",
+  coverageAmount: "coverage_amount",
+  rate: "rate",
+};
+
+/**
+ * Resolves a candidate's public `InformationalAmountType`. Most candidates
+ * here carry a `specialKey` set during extraction (principal, credit limit,
+ * income, ...); the one exception is a generic, free-text-classified
+ * `asset_value` candidate (e.g. a vehicle's cash price or a property's
+ * value) — it has no dedicated `SpecialValueKey` because no contract type's
+ * `typeDetails` schema has an "asset value" field, so its role
+ * (`semanticRole === "asset_value"`, assigned purely from label/description
+ * text — see `classify.ts`'s `isAssetValueText`) is the only signal.
+ */
+function resolveInformationalAmountType(candidate: Candidate): InformationalAmountType {
+  if (candidate.specialKey) {
+    return SPECIAL_KEY_TO_INFORMATIONAL_TYPE[candidate.specialKey];
+  }
+  return "asset_value";
+}
+
+/**
+ * Builds the public `informationalAmounts[]` collection from every
+ * `special`-targetKind candidate (principal, credit limit, coverage amount,
+ * income, a stated deductible, an outstanding balance, a stated grand
+ * total, or a stated rate/APR), plus any generically-classified
+ * `asset_value`-role candidate (a stated reference/collateral value with no
+ * dedicated `typeDetails` field — see `resolveInformationalAmountType`).
+ * These candidates were already extracted and classified — this only makes
+ * them individually inspectable, mirroring `buildFeeItems`/`buildPenaltyItems`.
+ * Never eligible to become a `PaymentObligation` (see
+ * `pipeline/eligibility.ts`), so there is no risk of a principal/limit/asset
+ * value double-counting as a payment obligation here.
+ */
+export function buildInformationalAmounts(candidates: readonly Candidate[], metadata: CalculatorMetadata): InformationalAmount[] {
+  return [...candidates]
+    .filter((candidate) => candidate.specialKey !== undefined || candidate.semanticRole === "asset_value")
+    .sort(bySourceField)
+    .map((candidate, index) => ({
+      id: `informational-${index}`,
+      type: resolveInformationalAmountType(candidate),
+      label: candidate.label,
+      amount: candidateToMoneyMetric(candidate, metadata),
+      percentage: candidateToPercentageMetric(candidate),
+      financialRole: toFinancialRole(candidate.semanticRole, candidate.frequency, candidate.refundable, candidate.paymentTiming),
+      sourceFields: [candidate.sourceField],
+    }));
 }

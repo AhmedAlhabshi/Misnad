@@ -55,6 +55,8 @@ const EMPTY_PII_STATISTICS: PiiStatistics = {
 
 const FAKE_ANALYSIS_RESULT: ContractUnderstanding = {
   contractType: "auto_finance",
+  contractSummary: "Contract summary.",
+  contractSummarySimple: "Simple contract summary.",
   parties: [],
   financialObligations: [
     { description: "Monthly installment", amount: 1500, currency: "SAR", frequency: "monthly", dueDate: null },

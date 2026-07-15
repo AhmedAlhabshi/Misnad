@@ -4,6 +4,8 @@ import { validateContractUnderstanding } from "../validate";
 export function run(): void {
   const fabricated = {
     contractType: "other",
+    contractSummary: "Contract summary.",
+    contractSummarySimple: "Simple contract summary.",
     parties: [],
     dates: [],
     penalties: [],
@@ -32,6 +34,8 @@ export function run(): void {
 
   const valid = {
     contractType: "other",
+    contractSummary: "Contract summary.",
+    contractSummarySimple: "Simple contract summary.",
     parties: [],
     financialObligations: [],
     dates: [],

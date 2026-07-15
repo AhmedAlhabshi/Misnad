@@ -3,6 +3,8 @@ import { validateContractUnderstanding } from "../validate";
 
 const BASE_FIELDS = {
   contractType: "other" as const,
+  contractSummary: "Contract summary.",
+  contractSummarySimple: "Simple contract summary.",
   parties: [],
   financialObligations: [],
   dates: [],
@@ -23,6 +25,7 @@ function clauseCandidate(evidence: string | null) {
         summary: "A 2% penalty applies for each day of delay.",
         riskLevel: "medium" as const,
         evidence,
+        plainExplanation: "Pay on time to avoid the extra 2% daily charge.",
       },
     ],
   };

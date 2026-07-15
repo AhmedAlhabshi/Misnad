@@ -1,5 +1,6 @@
 import type { AnalysisLanguage } from "@workspace/contract-types";
 import type { FeeType, ObligationType, PaymentFrequency, PenaltyType } from "@workspace/financial-metrics";
+import type { CanonicalConceptId } from "./financialConcepts";
 
 export interface FinancialMetricsCopy {
   title: string;
@@ -380,24 +381,110 @@ const EN: FinancialMetricsCopy = {
 export const FINANCIAL_METRICS_COPY: Record<AnalysisLanguage, FinancialMetricsCopy> = { ar: AR, en: EN };
 
 /**
- * The financial-metrics engine hard-codes a small, fixed set of English
- * labels for `typeDetails`-derived payment obligations (see
- * `lib/financial-metrics/src/pipeline/candidates.ts`'s `fromTypeDetailsAmount`
- * calls, e.g. "Down payment", "Monthly installment") — these never come from
- * the contract's own text, so the engine never localizes them. Everything
- * else on a `PaymentObligation.label` (e.g. a `financialObligations[]`
- * description) is genuine AI-generated or contract text already produced in
- * the requested analysis language, and must never be rewritten here.
+ * Centralized labels for every canonical financial concept (see
+ * `financialConcepts.ts`'s `CanonicalConceptId`) — generic across all
+ * contract types, and exhaustive over the closed concept enum, so no
+ * concept can ever fall through to a raw, untranslated engine label (the
+ * previous "Balloon payment" leaking untranslated into Arabic results was
+ * exactly this: a one-off 2-entry dictionary that only covered
+ * "Down payment"/"Monthly installment"). Callers should still fall back to
+ * the item's own sanitized, AI-generated label for the generic `"other"`
+ * concept when a more specific real-world label is available and useful.
  */
-const KNOWN_ENGINE_OBLIGATION_LABELS: Record<string, string> = {
-  "Down payment": "الدفعة المقدمة",
-  "Monthly installment": "القسط الشهري",
+const CANONICAL_CONCEPT_LABELS: Record<AnalysisLanguage, Record<CanonicalConceptId, string>> = {
+  ar: {
+    monthly_installment: "القسط الشهري",
+    monthly_rent: "الإيجار الشهري",
+    annual_rent: "الإيجار السنوي",
+    salary: "الراتب",
+    allowance: "البدل",
+    bonus: "المكافأة",
+    deduction: "الاستقطاع",
+    insurance_premium: "قسط التأمين",
+    deductible: "مبلغ التحمل",
+    coverage_limit: "حد التغطية التأمينية",
+    security_deposit: "مبلغ التأمين (الوديعة)",
+    brokerage_fee: "رسوم الوساطة",
+    administrative_fee: "الرسوم الإدارية",
+    annual_fee: "الرسوم السنوية",
+    subscription_fee: "رسوم الاشتراك",
+    down_payment: "الدفعة المقدمة",
+    final_payment: "الدفعة الختامية",
+    financing_principal: "مبلغ التمويل",
+    asset_value: "قيمة الأصل",
+    total_repayment: "إجمالي السداد",
+    financing_cost: "تكلفة التمويل",
+    credit_limit: "الحد الائتماني",
+    minimum_payment: "الحد الأدنى للسداد",
+    late_fee: "رسوم التأخير",
+    early_termination_fee: "رسوم الإنهاء المبكر",
+    collection_cost: "تكلفة التحصيل",
+    maintenance_cost: "تكلفة الصيانة",
+    renewal_cost: "تكلفة التجديد",
+    refund: "المبلغ المسترد",
+    tax: "الضريبة",
+    processing_fee: "رسوم المعالجة",
+    transfer_fee: "رسوم التحويل",
+    registration_fee: "رسوم التسجيل",
+    service_fee: "رسوم الخدمة",
+    early_settlement_fee: "رسوم السداد المبكر",
+    cancellation_fee: "رسوم الإلغاء",
+    returned_payment_fee: "رسوم الدفعة المرتجعة",
+    recurring_payment: "دفعة متكررة",
+    one_time_payment: "دفعة لمرة واحدة",
+    conditional_payment: "دفعة مشروطة",
+    interest_rate: "معدل الفائدة (APR)",
+    outstanding_balance: "الرصيد المتبقي",
+    other: "أخرى",
+  },
+  en: {
+    monthly_installment: "Monthly installment",
+    monthly_rent: "Monthly rent",
+    annual_rent: "Annual rent",
+    salary: "Salary",
+    allowance: "Allowance",
+    bonus: "Bonus",
+    deduction: "Deduction",
+    insurance_premium: "Insurance premium",
+    deductible: "Deductible",
+    coverage_limit: "Coverage limit",
+    security_deposit: "Security deposit",
+    brokerage_fee: "Brokerage fee",
+    administrative_fee: "Administrative fee",
+    annual_fee: "Annual fee",
+    subscription_fee: "Subscription fee",
+    down_payment: "Down payment",
+    final_payment: "Final payment",
+    financing_principal: "Financing principal",
+    asset_value: "Asset value",
+    total_repayment: "Total repayment",
+    financing_cost: "Financing cost",
+    credit_limit: "Credit limit",
+    minimum_payment: "Minimum payment",
+    late_fee: "Late fee",
+    early_termination_fee: "Early termination fee",
+    collection_cost: "Collection cost",
+    maintenance_cost: "Maintenance cost",
+    renewal_cost: "Renewal cost",
+    refund: "Refund",
+    tax: "Tax",
+    processing_fee: "Processing fee",
+    transfer_fee: "Transfer fee",
+    registration_fee: "Registration fee",
+    service_fee: "Service fee",
+    early_settlement_fee: "Early settlement fee",
+    cancellation_fee: "Cancellation fee",
+    returned_payment_fee: "Returned payment fee",
+    recurring_payment: "Recurring payment",
+    one_time_payment: "One-time payment",
+    conditional_payment: "Conditional payment",
+    interest_rate: "Interest rate (APR)",
+    outstanding_balance: "Outstanding balance",
+    other: "Other",
+  },
 };
 
-/** Localizes a `PaymentObligation.label` for Arabic output — a no-op for English, and a no-op for any label the engine didn't hard-code itself (see `KNOWN_ENGINE_OBLIGATION_LABELS`). */
-export function localizeObligationLabel(label: string, language: AnalysisLanguage): string {
-  if (language !== "ar") {
-    return label;
-  }
-  return KNOWN_ENGINE_OBLIGATION_LABELS[label] ?? label;
+/** Returns the centralized, localized label for a canonical financial concept id — exhaustive over the closed enum, never a raw engine label or schema key. */
+export function getCanonicalConceptLabel(conceptId: CanonicalConceptId, language: AnalysisLanguage): string {
+  return CANONICAL_CONCEPT_LABELS[language][conceptId];
 }

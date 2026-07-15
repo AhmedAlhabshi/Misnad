@@ -1,6 +1,6 @@
 import { z } from "zod/v4";
 import { idSchema, sourceFieldsSchema, uniqueIdArray } from "./common";
-import { feeTypeSchema, metricStatusSchema, paymentFrequencySchema } from "./enums";
+import { feeTypeSchema, financialRoleSchema, metricStatusSchema, paymentFrequencySchema } from "./enums";
 import { moneyMetricSchema } from "./moneyMetric";
 import { percentageMetricSchema } from "./percentageMetric";
 
@@ -15,6 +15,8 @@ export const feeItemSchema = z.object({
   mandatory: z.boolean().nullable(),
   conditional: z.boolean().nullable(),
   refundable: z.boolean().nullable(),
+  /** The semantic role this value plays (a recurring/one-time outflow, a conditional cost, ...) — see `FinancialRole`. */
+  financialRole: financialRoleSchema,
   sourceFields: sourceFieldsSchema,
 });
 

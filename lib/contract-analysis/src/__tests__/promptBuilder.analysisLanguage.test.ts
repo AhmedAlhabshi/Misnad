@@ -26,6 +26,8 @@ export function run(): void {
   );
 
   const userFacingFields = [
+    "contractSummary",
+    "contractSummarySimple",
     "parties[].role",
     "parties[].notes",
     "financialObligations[].description",
@@ -37,6 +39,7 @@ export function run(): void {
     "fees[].description",
     "importantClauses[].title",
     "importantClauses[].summary",
+    "importantClauses[].plainExplanation",
     "extractedNumbers[].label",
     "missingInformation[].reason",
     "extractionNotes",

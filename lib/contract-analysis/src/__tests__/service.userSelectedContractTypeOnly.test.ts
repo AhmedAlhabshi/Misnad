@@ -18,6 +18,8 @@ export async function run(): Promise<void> {
       return {
         rawText: JSON.stringify({
           contractType: "credit_card",
+          contractSummary: "Contract summary.",
+          contractSummarySimple: "Simple contract summary.",
           parties: [],
           financialObligations: [],
           dates: [],

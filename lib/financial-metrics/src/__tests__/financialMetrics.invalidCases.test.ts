@@ -33,6 +33,7 @@ function baseFinancialMetrics() {
     schemaVersion: "1.0" as const,
     currency: "SAR",
     paymentObligations: [] as unknown[],
+    informationalAmounts: [] as unknown[],
     recurringCommitment: {
       actualMonthlyAmount: unavailableMoney("not stated"),
       monthlyEquivalent: unavailableMoney("not stated"),

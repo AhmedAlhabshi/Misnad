@@ -4,16 +4,32 @@ import type { Candidate } from "./candidates";
 import { compareCandidatesByPriority } from "./priority";
 
 /**
- * Groups candidates that represent the *same metric slot*: special values
- * (principal, credit limit, ...) are singular by construction, so they
- * group by key alone; ordinary obligation/fee/penalty candidates only
- * group together when category, currency, frequency, and the exact
- * (normalized) label all match — this is what stops two genuinely
- * different fees that merely share a category from ever being treated as
- * conflicting reports of the same fee.
+ * `statedTotalCost` is the one `specialKey` that is NOT singular by
+ * construction — a real contract can state more than one distinct grand
+ * total under different names (e.g. "Total of Payments during the term" vs
+ * "Total repayment amount"), and these are separate stated facts, not
+ * conflicting reports of the same figure. Every other special key
+ * (principal, credit limit, income, a deductible, a coverage amount, an
+ * outstanding balance, a stated rate) genuinely is singular per contract.
+ */
+const NON_SINGULAR_SPECIAL_KEYS: ReadonlySet<string> = new Set(["statedTotalCost"]);
+
+/**
+ * Groups candidates that represent the *same metric slot*: most special
+ * values (principal, credit limit, ...) are singular by construction, so
+ * they group by key alone; `statedTotalCost` additionally groups by its
+ * normalized label, since a contract can legitimately state more than one
+ * distinct total. Ordinary obligation/fee/penalty candidates only group
+ * together when category, currency, frequency, and the exact (normalized)
+ * label all match — this is what stops two genuinely different fees that
+ * merely share a category from ever being treated as conflicting reports of
+ * the same fee.
  */
 function conflictGroupKey(candidate: Candidate): string {
   if (candidate.targetKind === "special") {
+    if (candidate.specialKey && NON_SINGULAR_SPECIAL_KEYS.has(candidate.specialKey)) {
+      return `special|${candidate.specialKey}|${normalizeLabel(candidate.label)}`;
+    }
     return `special|${candidate.specialKey}`;
   }
   return [

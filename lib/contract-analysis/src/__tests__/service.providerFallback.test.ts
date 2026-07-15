@@ -9,6 +9,8 @@ import type {
 const VALID_CREDIT_CARD_RESPONSE = JSON.stringify({
   contractType: "credit_card",
   detectedContractType: "credit_card",
+  contractSummary: "Contract summary.",
+  contractSummarySimple: "Simple contract summary.",
   parties: [],
   financialObligations: [],
   dates: [],

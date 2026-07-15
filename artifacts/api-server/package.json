@@ -8,7 +8,7 @@
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps --env-file=.env ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx src/routes/__tests__/analyzeContract.validation.test.ts && tsx src/routes/__tests__/analyzeContract.validType.test.ts && tsx src/routes/__tests__/analyzeContract.financialMetrics.test.ts && tsx src/services/__tests__/documentParser.test.ts && tsx src/services/__tests__/piiMasker.test.ts && tsx src/routes/__tests__/analyzeContract.documentExtraction.test.ts && tsx src/routes/__tests__/analyzeContract.financialRecoveryFixture.test.ts",
+    "test": "tsx src/routes/__tests__/analyzeContract.validation.test.ts && tsx src/routes/__tests__/analyzeContract.validType.test.ts && tsx src/routes/__tests__/analyzeContract.financialMetrics.test.ts && tsx src/routes/__tests__/analyzeContract.fileName.test.ts && tsx src/services/__tests__/documentParser.test.ts && tsx src/services/__tests__/piiMasker.test.ts && tsx src/routes/__tests__/analyzeContract.documentExtraction.test.ts && tsx src/routes/__tests__/analyzeContract.financialRecoveryFixture.test.ts && tsx src/routes/__tests__/analyzeFinancialImpact.validation.test.ts",
     "test:dist": "pnpm run build && tsx src/services/__tests__/tesseractWorkerPath.dist.test.ts"
   },
   "dependencies": {

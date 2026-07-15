@@ -5,7 +5,19 @@ import {
   PAYMENT_FREQUENCY_VALUES,
   PENALTY_TYPE_VALUES,
 } from "@workspace/financial-metrics";
-import { FINANCIAL_METRICS_COPY, localizeObligationLabel } from "../financialMetricsCopy";
+import { FINANCIAL_METRICS_COPY, getCanonicalConceptLabel } from "../financialMetricsCopy";
+
+/** Every id in `financialConcepts.ts`'s closed `CanonicalConceptId` enum — kept as a literal list here (rather than importing the type) so this test independently proves the label dictionary is exhaustive. */
+const ALL_CANONICAL_CONCEPT_IDS = [
+  "monthly_installment", "monthly_rent", "annual_rent", "salary", "allowance", "bonus", "deduction",
+  "insurance_premium", "deductible", "coverage_limit", "security_deposit", "brokerage_fee",
+  "administrative_fee", "annual_fee", "subscription_fee", "down_payment", "final_payment",
+  "financing_principal", "asset_value", "total_repayment", "financing_cost", "credit_limit",
+  "minimum_payment", "late_fee", "early_termination_fee", "collection_cost", "maintenance_cost",
+  "renewal_cost", "refund", "tax", "processing_fee", "transfer_fee", "registration_fee", "service_fee",
+  "early_settlement_fee", "cancellation_fee", "returned_payment_fee", "recurring_payment",
+  "one_time_payment", "conditional_payment", "interest_rate", "outstanding_balance", "other",
+] as const;
 
 /** Forbidden per Milestone 5.8 scope: no risk score, safe/unsafe, or affordability judgment anywhere in the shipped copy. */
 const FORBIDDEN_TERMS = [
@@ -84,16 +96,19 @@ export function run(): void {
     }
   }
 
-  // Known engine-hardcoded obligation labels ("Down payment", "Monthly installment" —
-  // see `pipeline/candidates.ts`'s `fromTypeDetailsAmount` calls) are localized for
-  // Arabic output, left untouched for English, and any other label (e.g. AI-generated
-  // financialObligations[] text, already in the requested language) passes through unchanged.
-  assert.equal(localizeObligationLabel("Down payment", "ar"), "الدفعة المقدمة");
-  assert.equal(localizeObligationLabel("Monthly installment", "ar"), "القسط الشهري");
-  assert.equal(localizeObligationLabel("Down payment", "en"), "Down payment");
-  assert.equal(localizeObligationLabel("Monthly installment", "en"), "Monthly installment");
-  assert.equal(localizeObligationLabel("الدفعة المقدمة الخاصة بالعميل", "ar"), "الدفعة المقدمة الخاصة بالعميل");
-  assert.equal(localizeObligationLabel("Late payment penalty", "ar"), "Late payment penalty");
+  // Every canonical financial concept id has a real, translated label in both
+  // languages — this is the generic fix for "Balloon payment" (and any other
+  // engine-hardcoded label) leaking untranslated: the UI never reads the raw
+  // engine label for a known concept, only this exhaustive dictionary.
+  for (const language of ["ar", "en"] as const) {
+    for (const conceptId of ALL_CANONICAL_CONCEPT_IDS) {
+      const label = getCanonicalConceptLabel(conceptId, language);
+      assert.ok(label && label.length > 0, `missing ${language} label for canonical concept "${conceptId}"`);
+    }
+  }
+  assert.equal(getCanonicalConceptLabel("final_payment", "ar"), "الدفعة الختامية", "the balloon/final-payment concept must be localized, not left as raw 'Balloon payment'");
+  assert.equal(getCanonicalConceptLabel("administrative_fee", "ar"), "الرسوم الإدارية");
+  assert.equal(getCanonicalConceptLabel("administrative_fee", "en"), "Administrative fee");
 
   // The Milestone 5.9 rename: the upfront-payment-to-financing ratio label must
   // clearly reference the financed amount, not a generic "base cost".

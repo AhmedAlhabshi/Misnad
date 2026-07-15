@@ -15,9 +15,16 @@ function App() {
 
   // Starting a new upload discards the previous result (analysis and
   // financial metrics together) so a stale result can never be shown
-  // alongside a new in-progress analysis.
+  // alongside a new in-progress analysis. Any object URL created for the
+  // previous result's PDF viewer is revoked here too — React state
+  // replacement alone does not release a blob URL.
   function handleStartAnalysis(upload: PendingUpload) {
-    setAnalysisResult(null);
+    setAnalysisResult((previous) => {
+      if (previous?.contractObjectUrl) {
+        URL.revokeObjectURL(previous.contractObjectUrl);
+      }
+      return null;
+    });
     setPendingUpload(upload);
   }
 
@@ -28,7 +35,7 @@ function App() {
 
   return (
     <TooltipProvider>
-      <div className="min-h-[100dvh] w-full max-w-[480px] mx-auto relative overflow-hidden bg-[#0D1117] text-white selection:bg-indigo-500/30">
+      <div className="min-h-[100dvh] w-full max-w-[480px] mx-auto relative overflow-x-hidden bg-[#0D1117] text-white selection:bg-indigo-500/30">
         <AnimatePresence mode="wait">
           {currentScreen === "home" && (
             <HomeScreen key="home" onNavigate={setCurrentScreen} onStartAnalysis={handleStartAnalysis} />

@@ -57,6 +57,13 @@ export const importantClauseSchema = z.object({
    * containment).
    */
   evidence: z.string().max(350).nullable(),
+  /**
+   * The practical, plain-language meaning of this clause for the user —
+   * distinct from `summary` (the factual/extracted "what does the contract
+   * say" restatement). Never legal or financial advice, never a repeat of
+   * `summary` verbatim. Same field across all contract types.
+   */
+  plainExplanation: z.string().max(350),
 });
 
 export const extractedNumberSchema = z.object({
@@ -205,6 +212,22 @@ function buildContractUnderstandingSchema<
 >(typeDetailsSchema: TypeDetails, contractTypeField?: ContractTypeField) {
   return z.object({
     contractType: contractTypeField ?? contractTypeSchema,
+    /**
+     * A short (1-3 sentence), contract-type-agnostic plain-language
+     * explanation of the contractual relationship: what kind of agreement
+     * this is, who generally provides what, what the user is agreeing to,
+     * and how it works at a high level. Never a financial summary/dashboard
+     * framing — that belongs to the deterministic financial-metrics layer,
+     * not this field.
+     */
+    contractSummary: z.string().max(500),
+    /**
+     * The same explanation as `contractSummary`, rewritten in the simplest
+     * possible everyday language (no legal/financial jargon), generated in
+     * the same call so the UI's "explain more simply" toggle never needs a
+     * second AI round-trip.
+     */
+    contractSummarySimple: z.string().max(350),
     // Array limits bound worst-case structured-output size (see
     // promptBuilder.ts for the matching prompt-level instructions) so a
     // long template contract can still return complete, valid JSON within
@@ -214,7 +237,14 @@ function buildContractUnderstandingSchema<
     dates: z.array(contractDateSchema).max(12),
     penalties: z.array(penaltySchema).max(10),
     fees: z.array(feeSchema).max(10),
-    importantClauses: z.array(importantClauseSchema).max(10),
+    /**
+     * The Overview tab must show every meaningful clause actually present
+     * in the contract, not a small curated subset — 30 is a generic safety
+     * ceiling against pathological/runaway output, not a target count; the
+     * prompt instructs the model to extract all distinct meaningful clauses
+     * up to this limit, for every contract type.
+     */
+    importantClauses: z.array(importantClauseSchema).max(30),
     extractedNumbers: z.array(extractedNumberSchema).max(20),
     missingInformation: z.array(missingInformationItemSchema).max(15),
     extractionNotes: z.string().max(700).nullable(),

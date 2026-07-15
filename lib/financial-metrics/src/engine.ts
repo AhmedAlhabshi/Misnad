@@ -19,6 +19,7 @@ import {
 import { deduplicateCandidates } from "./pipeline/dedupe";
 import {
   buildFeeItems,
+  buildInformationalAmounts,
   buildObligationRefundabilityMap,
   buildPaymentObligations,
   buildPenaltyItems,
@@ -125,6 +126,17 @@ export function calculateFinancialMetrics(
   const obligationCandidates = finalCandidates.filter((candidate) => candidate.targetKind === "obligation");
   const feeCandidates = finalCandidates.filter((candidate) => candidate.targetKind === "fee");
   const penaltyCandidates = finalCandidates.filter((candidate) => candidate.targetKind === "penalty");
+  // Informational/reference candidates come from two sources: explicit
+  // `special`-targetKind candidates (principal, credit limit, income, ...,
+  // routed via a dedicated `typeDetails` field), and generic obligation
+  // candidates that free-text classification resolved to `asset_value` (a
+  // stated reference/collateral value with no dedicated `typeDetails` field
+  // in any contract type's schema — e.g. a vehicle's cash price or a
+  // property's value). Both are equally "stated facts that are not payment
+  // obligations" and belong in the same public collection.
+  const informationalCandidates = finalCandidates.filter(
+    (candidate) => candidate.targetKind === "special" || candidate.semanticRole === "asset_value",
+  );
   const specialMap = resolveSpecialCandidateMap(finalCandidates);
 
   const metadata = emptyMetadata();
@@ -133,6 +145,7 @@ export function calculateFinancialMetrics(
   const obligationRefundability = buildObligationRefundabilityMap(obligationCandidates);
   const feeItems = buildFeeItems(feeCandidates, metadata);
   const penaltyItems = buildPenaltyItems(penaltyCandidates, metadata);
+  const informationalAmounts = buildInformationalAmounts(informationalCandidates, metadata);
 
   const { result: fees, metadata: feeMetadata } = buildFeeCollection(feeItems);
   const { result: penalties, metadata: penaltyMetadata } = buildPenaltyCollection(penaltyItems);
@@ -224,6 +237,7 @@ export function calculateFinancialMetrics(
     schemaVersion: FINANCIAL_METRICS_SCHEMA_VERSION,
     currency: contractCurrency,
     paymentObligations,
+    informationalAmounts,
     recurringCommitment,
     contractDuration,
     totalCost,

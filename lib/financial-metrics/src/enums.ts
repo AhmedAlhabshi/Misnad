@@ -69,6 +69,34 @@ export const PENALTY_TYPE_VALUES = [
 export const penaltyTypeSchema = z.enum(PENALTY_TYPE_VALUES);
 export type PenaltyType = z.infer<typeof penaltyTypeSchema>;
 
+/**
+ * The semantic role a financial value plays — not every number is a
+ * "cost". Drives which items are guaranteed outflows vs. conditional costs
+ * vs. purely informational (income, a credit/coverage limit, an asset
+ * value, a financing principal, ...), so the presentation layer never
+ * treats all money as generic expense.
+ */
+export const FINANCIAL_ROLE_VALUES = [
+  "income",
+  "recurring_outflow",
+  "one_time_outflow",
+  "upfront_liquidity",
+  "refundable",
+  "conditional_cost",
+  "financing_principal",
+  "asset_value",
+  "credit_limit",
+  "coverage_limit",
+  "benefit",
+  "refund",
+  "rate_or_percentage",
+  "informational_total",
+  "deduction",
+  "other",
+] as const;
+export const financialRoleSchema = z.enum(FINANCIAL_ROLE_VALUES);
+export type FinancialRole = z.infer<typeof financialRoleSchema>;
+
 export const COST_DIFFERENCE_CLASSIFICATION_VALUES = [
   "match",
   "rounding",

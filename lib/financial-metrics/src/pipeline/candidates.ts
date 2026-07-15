@@ -10,10 +10,12 @@ import {
   classifyScenarioContext,
   inferConditionalFromText,
   inferMandatoryFromText,
+  inferPaymentTimingFromText,
   inferRefundableFromText,
   isAssetValueText,
   isScenarioBalanceText,
   isStatedTotalCostText,
+  type PaymentTiming,
 } from "./classify";
 import type { CandidateContext, CandidateSemanticRole } from "./semantics";
 
@@ -70,7 +72,9 @@ export type SpecialValueKey =
   | "outstandingBalance"
   | "monthlyIncome"
   | "statedTotalCost"
-  | "insuranceDeductible";
+  | "insuranceDeductible"
+  | "coverageAmount"
+  | "rate";
 
 export type CandidateSourceKind =
   | "type_details"
@@ -112,6 +116,15 @@ export interface Candidate {
   mandatory: boolean | null;
   conditional: boolean | null;
   refundable: boolean | null;
+  /**
+   * Explicit signal, from the contract's own wording, of whether a one-time
+   * amount is due now (at signing/contract start) or due later — `null`
+   * when the text states neither. Only ever set from real timing wording
+   * (see `inferPaymentTimingFromText`), never inferred from fee/obligation
+   * type or amount, so a one-time cost with unstated timing never silently
+   * becomes an upfront liquidity deduction.
+   */
+  paymentTiming: PaymentTiming | null;
   calculationBase: string | null;
   trigger: string | null;
   sourceKind: CandidateSourceKind;
@@ -135,6 +148,7 @@ function baseCandidate(sourceKind: CandidateSourceKind, sourceField: string): Om
     mandatory: null,
     conditional: null,
     refundable: null,
+    paymentTiming: null,
     calculationBase: null,
     trigger: null,
     sourceKind,
@@ -160,6 +174,35 @@ function fromTypeDetailsAmount(
     label,
     amountValue,
     currency: null,
+    evidence: label,
+    ...extra,
+  };
+}
+
+/**
+ * Sibling to `fromTypeDetailsAmount` for a stated percentage/rate fact (e.g.
+ * an APR or interest rate) rather than a currency amount — routes the value
+ * into `percentageValue` instead of `amountValue`/`currency`. Always
+ * `targetKind: "special"` since a rate is never itself a payment obligation.
+ */
+function fromTypeDetailsPercentage(
+  sourceField: string,
+  label: string,
+  value: number | null,
+  extra: Partial<Candidate>,
+): Candidate | null {
+  const percentageValue = sanitizeNumericAmount(value);
+  if (percentageValue === null) {
+    return null;
+  }
+  return {
+    ...baseCandidate("type_details", sourceField),
+    targetKind: "special",
+    specialKey: "rate",
+    label,
+    amountValue: null,
+    currency: null,
+    percentageValue,
     evidence: label,
     ...extra,
   };
@@ -191,6 +234,7 @@ function extractFromFinancialObligations(input: ContractUnderstanding): Candidat
       // Only meaningful for obligationType "deposit" — see calculators/costs.ts's
       // tri-state handling — but harmless to compute for every obligation.
       refundable: inferRefundableFromText(obligation.description),
+      paymentTiming: inferPaymentTimingFromText(obligation.description),
       startDate: obligation.dueDate,
       evidence: obligation.description,
     };
@@ -212,6 +256,7 @@ function extractFromFees(input: ContractUnderstanding): Candidate[] {
       mandatory: inferMandatoryFromText(fee.description),
       conditional: inferConditionalFromText(fee.description),
       refundable: inferRefundableFromText(fee.description),
+      paymentTiming: inferPaymentTimingFromText(fee.description),
       evidence: fee.description,
     };
   });
@@ -322,9 +367,9 @@ function extractStatedTotalCostCandidates(input: ContractUnderstanding): Candida
  * contract type exposes a different, explicit set of numeric fields (see
  * `@workspace/contract-schema`'s discriminated union) — only fields that
  * represent an actual customer-owed cost, commitment, or a small set of
- * special headline values (principal, credit limit, deductible, income)
- * are extracted; purely contextual fields (interest rate, property value,
- * coverage amount, job title, etc.) are intentionally not consumed by any
+ * special headline values (principal, credit limit, deductible, income,
+ * a stated interest rate/APR) are extracted; purely contextual fields
+ * (property value, job title, etc.) are intentionally not consumed by any
  * Milestone 5.5 output field and are left out here.
  */
 function extractFromTypeDetails(input: ContractUnderstanding): Candidate[] {
@@ -351,12 +396,14 @@ function extractFromTypeDetails(input: ContractUnderstanding): Candidate[] {
         obligationType: "recurring_payment",
         frequency: "monthly",
         mandatory: true,
+        numberOfPayments: details.loanTermMonths,
       }));
       push(fromTypeDetailsAmount("typeDetails.balloonPayment", "Balloon payment", details.balloonPayment, {
         obligationType: "balloon_payment",
         frequency: "one_time",
         mandatory: true,
       }));
+      push(fromTypeDetailsPercentage("typeDetails.interestRate", "Interest rate (APR)", details.interestRate, {}));
       break;
     }
     case "personal_finance": {
@@ -368,7 +415,9 @@ function extractFromTypeDetails(input: ContractUnderstanding): Candidate[] {
         obligationType: "recurring_payment",
         frequency: "monthly",
         mandatory: true,
+        numberOfPayments: details.loanTermMonths,
       }));
+      push(fromTypeDetailsPercentage("typeDetails.interestRate", "Interest rate (APR)", details.interestRate, {}));
       break;
     }
     case "mortgage": {
@@ -386,6 +435,7 @@ function extractFromTypeDetails(input: ContractUnderstanding): Candidate[] {
         frequency: "monthly",
         mandatory: true,
       }));
+      push(fromTypeDetailsPercentage("typeDetails.interestRate", "Interest rate (APR)", details.interestRate, {}));
       break;
     }
     case "credit_card": {
@@ -410,6 +460,7 @@ function extractFromTypeDetails(input: ContractUnderstanding): Candidate[] {
         mandatory: false,
         conditional: true,
       }));
+      push(fromTypeDetailsPercentage("typeDetails.interestRateApr", "Interest rate (APR)", details.interestRateApr, {}));
       break;
     }
     case "lease": {
@@ -417,6 +468,7 @@ function extractFromTypeDetails(input: ContractUnderstanding): Candidate[] {
         obligationType: "recurring_payment",
         frequency: "monthly",
         mandatory: true,
+        numberOfPayments: details.leaseTermMonths,
       }));
       push(fromTypeDetailsAmount("typeDetails.securityDeposit", "Security deposit", details.securityDeposit, {
         obligationType: "deposit",
@@ -441,6 +493,10 @@ function extractFromTypeDetails(input: ContractUnderstanding): Candidate[] {
       push(fromTypeDetailsAmount("typeDetails.deductible", "Insurance deductible", details.deductible, {
         targetKind: "special",
         specialKey: "insuranceDeductible",
+      }));
+      push(fromTypeDetailsAmount("typeDetails.coverageAmount", "Coverage amount", details.coverageAmount, {
+        targetKind: "special",
+        specialKey: "coverageAmount",
       }));
       break;
     }
@@ -474,6 +530,8 @@ const SPECIAL_KEY_TO_ROLE: Record<SpecialValueKey, CandidateSemanticRole> = {
   monthlyIncome: "income",
   statedTotalCost: "reference_value",
   insuranceDeductible: "conditional_fee",
+  coverageAmount: "coverage_limit",
+  rate: "rate",
 };
 
 /**
