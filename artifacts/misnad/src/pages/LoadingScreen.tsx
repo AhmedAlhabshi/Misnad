@@ -132,6 +132,7 @@ export default function LoadingScreen({
           financialMetricsError: body.financialMetricsError ?? null,
           documentExtraction: body.documentExtraction ?? null,
           contractObjectUrl,
+          contractRagSessionId: body.contractRagSessionId ?? null,
         };
 
         onAnalysisComplete(result);

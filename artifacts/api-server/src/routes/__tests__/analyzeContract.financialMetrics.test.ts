@@ -96,6 +96,9 @@ function baseDeps(overrides: Partial<AnalyzeContractHandlerDeps> = {}): AnalyzeC
     calculateFinancialMetrics(): FinancialMetrics {
       return { schemaVersion: "1.0" } as unknown as FinancialMetrics;
     },
+    async indexContractRagSession() {
+      return { sessionId: "fake-session-id" };
+    },
     ...overrides,
   } as AnalyzeContractHandlerDeps;
 }

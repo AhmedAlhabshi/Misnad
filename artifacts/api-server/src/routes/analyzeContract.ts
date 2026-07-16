@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import multer from "multer";
 import { extractDocumentText } from "../services/documentParser";
+import { indexContractRagSession } from "../services/contractRagIndexer";
 import { maskPii } from "../services/piiMasker";
 import { analyzeContract, ContractAnalysisError } from "@workspace/contract-analysis";
 import { DocumentOcrError, type DocumentExtractionResult } from "@workspace/document-ocr";
@@ -81,6 +82,7 @@ export interface AnalyzeContractHandlerDeps {
   maskPii: typeof maskPii;
   analyzeContract: typeof analyzeContract;
   calculateFinancialMetrics: typeof calculateFinancialMetrics;
+  indexContractRagSession: typeof indexContractRagSession;
 }
 
 const defaultDeps: AnalyzeContractHandlerDeps = {
@@ -88,6 +90,7 @@ const defaultDeps: AnalyzeContractHandlerDeps = {
   maskPii,
   analyzeContract,
   calculateFinancialMetrics,
+  indexContractRagSession,
 };
 
 /**
@@ -163,6 +166,29 @@ export async function handleAnalyzeContract(
     // Stage 2: Mask PII before any future AI processing
     const masked = deps.maskPii(extraction.text);
 
+    // Stage 2.5: Contract RAG indexing (additive feature — failure here must
+    // never fail the upload/extraction/masking flow). Uses ONLY the
+    // already-masked text; never the raw extracted text. Runs independently
+    // of AI analysis success, since the retrieval session doesn't depend on
+    // the analysis output — only on the masked text itself.
+    let contractRagSessionId: string | null = null;
+    let contractRagError: string | null = null;
+
+    try {
+      const indexResult = await deps.indexContractRagSession(
+        { maskedText: masked.maskedText },
+        userSelectedContractType,
+        analysisLanguage,
+      );
+      contractRagSessionId = indexResult.sessionId;
+    } catch (err) {
+      contractRagError = "CONTRACT_RAG_UNAVAILABLE";
+      req.log.warn(
+        { message: err instanceof Error ? err.message : String(err) },
+        "Contract RAG indexing failed",
+      );
+    }
+
     // Stage 3: AI contract understanding (additive feature — failure here must
     // never fail the upload/extraction/masking flow above). Uses only the
     // user-selected contract type; there is no independent AI detection.
@@ -230,6 +256,8 @@ export async function handleAnalyzeContract(
       analysis,
       financialMetrics,
       financialMetricsError,
+      contractRagSessionId,
+      contractRagError,
       ...(analysisError ? { analysisError } : {}),
       // Raw/masked text previews (native or OCR-derived) are a
       // development-only aid — the frontend never reads these fields, and

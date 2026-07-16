@@ -25,6 +25,9 @@
       "path": "./lib/legal-rag"
     },
     {
+      "path": "./lib/contract-rag"
+    },
+    {
       "path": "./lib/api-client-react"
     },
     {

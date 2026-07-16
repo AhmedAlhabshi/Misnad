@@ -108,6 +108,9 @@ export async function run(): Promise<void> {
       capturedFinancialMetricsArgs = args;
       return FAKE_FINANCIAL_METRICS;
     },
+    async indexContractRagSession() {
+      return { sessionId: "fake-session-id" };
+    },
   } as AnalyzeContractHandlerDeps;
 
   const req = createMockReq({

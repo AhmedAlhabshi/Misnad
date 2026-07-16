@@ -1,4 +1,8 @@
 import { legalSourceDocumentSchema, type LegalSourceDocument } from "./schema";
+import { CIVIL_TRANSACTIONS_LAW_SOURCE } from "./sources/civilTransactionsLaw";
+import { EJAR_LANDLORD_TENANT_PROVISIONS_SOURCE } from "./sources/ejarLandlordTenantProvisions";
+import { INSURANCE_MARKET_CONDUCT_SOURCE } from "./sources/insuranceMarketConduct";
+import { LABOR_LAW_SOURCE } from "./sources/laborLaw";
 import { SAMA_APR_SOURCE } from "./sources/samaApr";
 import { SAMA_CONSUMER_FINANCING_SOURCE } from "./sources/samaConsumerFinancing";
 
@@ -7,13 +11,15 @@ export * from "./schema";
 /**
  * The full curated source manifest. Adding a new official document means
  * adding one entry here (and its own `sources/*.ts` file for readability as
- * the list grows) — never a schema or pipeline change. Only SAMA sources are
- * populated in this phase; other authorities are reachable purely by adding
- * their own source files here later (see the registry in `../registry`).
+ * the list grows) — never a schema or pipeline change.
  */
 export const LEGAL_SOURCE_MANIFEST: readonly LegalSourceDocument[] = [
   SAMA_CONSUMER_FINANCING_SOURCE,
   SAMA_APR_SOURCE,
+  CIVIL_TRANSACTIONS_LAW_SOURCE,
+  LABOR_LAW_SOURCE,
+  EJAR_LANDLORD_TENANT_PROVISIONS_SOURCE,
+  INSURANCE_MARKET_CONDUCT_SOURCE,
 ];
 
 export interface ManifestValidationResult {

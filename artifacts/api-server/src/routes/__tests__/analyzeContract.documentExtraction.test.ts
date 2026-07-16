@@ -57,6 +57,10 @@ const FAKE_ANALYSIS_RESULT: ContractUnderstanding = {
   },
 };
 
+async function fakeIndexContractRagSession() {
+  return { sessionId: "fake-session-id" };
+}
+
 function baseDeps(extraction: DocumentExtractionResult, overrides: Partial<AnalyzeContractHandlerDeps> = {}): AnalyzeContractHandlerDeps {
   return {
     async extractDocumentText() {
@@ -69,6 +73,7 @@ function baseDeps(extraction: DocumentExtractionResult, overrides: Partial<Analy
     calculateFinancialMetrics(): FinancialMetrics {
       return { schemaVersion: "1.0" } as unknown as FinancialMetrics;
     },
+    indexContractRagSession: fakeIndexContractRagSession,
     ...overrides,
   };
 }
@@ -189,6 +194,7 @@ async function testDocumentOcrErrorSurfacesWithCode(): Promise<void> {
     calculateFinancialMetrics(): FinancialMetrics {
       throw new Error("must not be reached");
     },
+    indexContractRagSession: fakeIndexContractRagSession,
   };
 
   await handleAnalyzeContract(req, res, deps);
@@ -216,6 +222,7 @@ async function testPlainErrorHasNoCodeField(): Promise<void> {
     calculateFinancialMetrics(): FinancialMetrics {
       throw new Error("must not be reached");
     },
+    indexContractRagSession: fakeIndexContractRagSession,
   };
 
   await handleAnalyzeContract(req, res, deps);

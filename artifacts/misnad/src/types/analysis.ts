@@ -133,6 +133,15 @@ export interface AnalyzeContractApiResponse {
   financialMetricsError?: FinancialMetricsPublicError | null;
   /** Absent on older backend responses — the UI must not break if missing. */
   documentExtraction?: DocumentExtractionSummary;
+  /**
+   * Opaque, short-lived Contract RAG session id — an implementation detail
+   * for a future chat feature, never shown in any visible UI and never
+   * placed in the URL. Absent on older backend responses; `null` when
+   * indexing failed or was unavailable for this analysis.
+   */
+  contractRagSessionId?: string | null;
+  /** Bounded, non-internal status code when Contract RAG indexing failed — never a raw database error. Absent on older backend responses. */
+  contractRagError?: string | null;
 }
 
 export interface PendingUpload {
@@ -160,4 +169,13 @@ export interface StoredAnalysisResult {
    * failed).
    */
   contractObjectUrl: string | null;
+  /**
+   * Opaque Contract RAG session id retained for this result's current
+   * in-memory session only — not persisted beyond this result's existing
+   * lifetime (same as `contractObjectUrl`), never put in the URL, and never
+   * rendered in any visible UI. Consumed by a future chat feature. `null`
+   * when Contract RAG indexing failed, was unavailable, or the backend
+   * response predates this field.
+   */
+  contractRagSessionId: string | null;
 }

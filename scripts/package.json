@@ -8,10 +8,15 @@
     "verify-contract-types": "tsx ./src/verify-contract-types.ts",
     "verify-contract-analysis": "tsx ./src/verify-contract-analysis.ts",
     "ingest-legal-source": "tsx ./src/ingest-legal-source.ts",
+    "ingest-legal-collection": "tsx ./src/ingest-legal-collection.ts",
+    "verify-legal-rag-live": "tsx ./src/verify-legal-rag-live.ts",
+    "cleanup-contract-rag": "tsx ./src/cleanup-contract-rag.ts",
+    "verify-contract-rag-live": "tsx ./src/verify-contract-rag-live.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@workspace/contract-analysis": "workspace:*",
+    "@workspace/contract-rag": "workspace:*",
     "@workspace/contract-types": "workspace:*",
     "@workspace/legal-rag": "workspace:*"
   },

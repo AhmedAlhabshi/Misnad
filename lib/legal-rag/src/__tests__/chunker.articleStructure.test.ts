@@ -62,6 +62,58 @@ The Borrower may prepay at any time without incurring any Term Cost for the rema
   }
   console.log("PASS Arabic 'المادة N' headings split into distinct, non-merged chunks");
 
+  // --- Arabic compound-ordinal article numbers (Saudi legislative style, e.g. Article 178) are captured in full, not cut off at the first word ---
+  {
+    const text = `المادة الثامنة والسبعون بعد المائة:
+
+يجوز للمتعاقدين أن يحددا مقدماً مقدار التعويض بالنص عليه في العقد.
+
+المادة التاسعة والسبعون بعد المائة:
+
+للمحكمة بناءً على طلب المدين أن تنقص هذا التعويض إذا أثبت أن التعويض المتفق عليه كان مبالغاً فيه.`;
+    const chunks = chunkLegalText(text, meta({ language: "ar" }));
+
+    assert.equal(chunks.length, 2);
+    assert.equal(
+      chunks[0].articleNumber,
+      "المادة الثامنة والسبعون بعد المائة",
+      "a multi-word Arabic ordinal article number must be captured in full, never truncated to its first word",
+    );
+    assert.ok(chunks[0].text.includes("يجوز للمتعاقدين"), "the article body must not have its own heading words swallowed into it");
+    assert.equal(chunks[1].articleNumber, "المادة التاسعة والسبعون بعد المائة");
+  }
+  console.log("PASS a compound multi-word Arabic ordinal article number (e.g. Article 178) is captured in full");
+
+  // --- Arabic ordinal-enumeration headings (أولاً/ثانياً/...) used by regulatory texts instead of المادة N ---
+  // Deliberately mixes both valid tanween-fatha orderings a real official document might use for the same
+  // word — "أولاً" (mark after a trailing alif) and "ثامنًا" (mark directly on the final letter) — since the
+  // REGA landlord–tenant regulation this was written for uses the latter throughout.
+  {
+    const text = `أولاً: لأغراض تطبيق هذه الأحكام، يُقصد بالمصطلحات الآتية المعاني المبينة أمامها:
+
+1. العقار: جميع المباني والأراضي.
+
+ثامنًا:
+
+يتجدد عقد الإيجار تلقائياً ما لم يُشعر أحد طرفيه الطرف الآخر بعدم الرغبة في التجديد.
+
+حادي عشر:
+
+تُمنح مكافأة تشجيعية لمن يبلغ عن مخالفة.`;
+    const chunks = chunkLegalText(text, meta({ language: "ar" }));
+
+    assert.equal(chunks.length, 3, "each ordinal-enumeration heading must produce its own chunk");
+    assert.equal(chunks[0].articleNumber, "أولا", "matched regardless of tanween-mark placement, always captured tanween-stripped");
+    assert.equal(chunks[1].articleNumber, "ثامنا", "the mark-directly-on-the-letter ordering (ثامنًا) must match the same as the trailing-alif ordering");
+    assert.ok(chunks[1].text.includes("يتجدد عقد الإيجار تلقائياً"));
+    assert.equal(chunks[2].articleNumber, "حادي عشر", "an 11th-style two-word ordinal (حادي عشر) must be captured, not just the first word");
+    assert.ok(!chunks[1].text.includes("مكافأة تشجيعية"), "an ordinal-enumeration chunk must never bleed into the next one's text");
+    for (const chunk of chunks) {
+      assert.equal(chunk.needsManualReview, false, "a chunk produced from a detected ordinal-enumeration heading must not be flagged for manual review");
+    }
+  }
+  console.log("PASS Arabic ordinal-enumeration headings (أولاً/ثامنًا/.../حادي عشر) split into distinct, non-merged chunks regardless of tanween-mark placement");
+
   // --- Chapter/section heading is attached to the following article ---
   {
     const text = `Section Two - Financing Contracts

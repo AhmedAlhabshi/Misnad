@@ -52,7 +52,29 @@ export const OFFICIAL_DOMAIN_ALLOWLIST = [
   "sama.gov.sa",
   // Bureau of Experts / National Center for Legislation — domain observed
   // via search results this phase, not yet fetched; no source cites it yet.
+  // (laws.boe.gov.sa itself could not be reached from this environment —
+  // TLS certificate chain verification failure — so the Civil Transactions
+  // Law was instead fetched directly from the Official Gazette below.)
   "laws.boe.gov.sa",
+  // Official Gazette of Saudi Arabia (جريدة أم القرى) — the Kingdom's
+  // government publication of record for every law and Cabinet resolution.
+  // Fetched and directly verified in this phase: both the Civil
+  // Transactions Law's full promulgated text (uqn.gov.sa/details?p=23125)
+  // and its Council of Ministers approval resolution
+  // (uqn.gov.sa/details?p=23123), including the real publication date
+  // (1444-12-01H / 2023-06-19G) and the drafting authority (هيئة الخبراء
+  // بمجلس الوزراء, named explicitly in the resolution text).
+  "uqn.gov.sa",
+  // Ministry of Human Resources and Social Development — reached via the
+  // Official Gazette (see "uqn.gov.sa" above) for the actual Labor Law
+  // amendment source; the ministry's own domain (mhrsd.gov.sa) itself
+  // could not be resolved from this environment.
+  // Real Estate General Authority (الهيئة العامة للعقار) — fetched and
+  // directly verified in this phase: rega.gov.sa/... hosts the full text
+  // of "الأحكام النظامية الخاصة بضبط العلاقة بين المؤجر والمستأجر"
+  // (Royal Decree M/73, 1447H), the landlord-tenant regulation used for
+  // the "ejar" collection.
+  "rega.gov.sa",
   // Prepared for future collections (§ legal-collection registry) — not
   // fetched or verified this phase, and no manifest entry references them.
   "hrsd.gov.sa",

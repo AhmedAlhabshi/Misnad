@@ -1,0 +1,53 @@
+Implementing Regulations of the Cooperative Insurance Companies Control Law
+Insurance Market Code of Conduct (Part 2 & Part 3)
+
+Article One (Definitions, selected terms)
+7. Insurance: Mechanism of contractually shifting burdens of pure risks by pooling them.
+14. Insurer: An insurance company that accept insurance contracts directly from insured(s).
+16. Insured: A natural person or juristic entity, which has entered into an insurance contract.
+17. Insurance Policy: Legal document/contract issued to the insured by the insurer setting out the terms of the contract to indemnify the insured for loss and damages covered by the policy against a premium paid by the insured.
+18. Contribution (Premium): Amount offered by the insured to the insurer in exchange for the insurer's acceptance to indemnify the insured for loss / damages resulting directly from a covered risk.
+19. Beneficiary: A natural person or juristic entity to whom the benefit(s) under the insurance policy is assigned as a result of a covered loss.
+
+Non-Discrimination
+13. Companies should not unfairly discriminate between customers; treatment should not differ based on customer (exiting or potential) race or gender. Companies must provide credible reasons for denying, canceling, and not renewing insurance policies. Furthermore, these reasons should be detailed in the customer's file and be made available to SAMA upon request.
+
+Disclosure Information to Customers
+15. Companies must communicate all relevant information to customers in a timely manner to enable them to make informed decisions.
+16. Companies must take reasonable measures to ensure the accuracy and clarity of the information provided to customers and make such information available in writing.
+
+Policy Cancellation
+25. Companies should include cancellation terms that are fair to customers and are reasonable and appropriate with regard to the product. The cancellation conditions must be clearly stated in the policy contract, including: a) Conditions permitting the insurance company to cancel the policy. b) Conditions permitting the policyholder to cancel the policy. c) Cancellation notice requirements, including notice period. In any case, excluding emergency cases such as war, riots, strikes, and terrorist attacks, the policyholder should be afforded a minimum period of thirty (30) days before the effective date of cancellation by the companies (as per article 54 of the Implementing Regulations). d) A description of the refund of premium due to the policyholder on cancellation of the policy and when it would be payable.
+
+Policy Cancellation — Protection and Savings Products
+25. e) For Protection and Savings insurance, in addition to the refund description above, a description and illustration of the cash surrender value, if applicable, for each year of the plan.
+
+"Free Look" Clause — Right to Cancel a New Policy (Protection & Savings Insurance Products)
+26. Every policy for protection and savings insurance should provide at least a twenty-one (21) day Free Look period from the date of delivery of the insurance contract for the policyholder to review the contract to assess its suitability and whether it provides the benefits described by the agent or broker. The policy will be deemed to be fully in force and this provision will be deemed to be waived by the policyholder, if the policyholder does not inform the insurance company within the period that the policy will be returned. If the policyholder deems the policy unsuitable, the insurance company must be notified in writing within the Free Look period and a refund of premiums paid to the customer subject only to certain deductions described below.
+
+"Free Look" Clause — Permitted Refund Deductions
+26. The refund of premiums during the Free Look period is subject only to the following: a) Deduction of the expenses incurred by the insurance company on medical examination of the customer. b) Deduction of a proportionate risk premium for the period of cover. c) In respect of a unit linked plan, the insurance company shall also be entitled to make an appropriate adjustment to take account of changes in the unit price.
+
+Disclosure to Customers
+37. Prior to accepting an application for an insurance policy, the companies must provide customers, upon their request, with the key terms and conditions of the product and service to be purchased, including but not limited to: a) The name of the insurance company underwriting the policy. b) Benefits, exclusions, and deductibles. c) The coverage period. d) All related costs, including premiums and any other fees. e) The terms of payment covering the periodicity of payment, grace period, implications of discontinuing the premium and any other related details. f) The claims handling procedure. g) The complaints handling procedures. h) The obligations of each party under the insurance policy. i) The cancellation rights and conditions. j) The renewal date and contract clauses to be renegotiated (if any).
+
+Claims Handling — Filing, Acknowledgment, and Investigation
+52. For companies whose licensed activities includes claims handling, they must: a) Respond to claims filing in a prompt manner. b) Provide claims forms showing all the information or steps required by the customer (including the beneficiary under a protection and savings policy) to file the claim. c) Acknowledge to the insured customer the receipt of the claim and any missing information and documents within seven (7) calendar days from receiving the claim's application form. d) Provide adequate guidance to the insured customer in filing the claim and information on the claims handling process. e) Inform insured customers of the progress of filed claims, at least every fifteen (15) working days (as per article 44 of the Implementing Regulations). f) Handle claims in a fair manner. g) Appoint a claims or loss adjuster when necessary, and notify the customer of such an appointment within three (3) working days. h) Conduct a reasonable investigation of claims within a time period not exceeding ten (10) days for individual policyholders and thirty (30) days for commercial entities.
+
+Claims Handling — Claim Acceptance or Rejection Decision
+52. i) The company must notify the customer in writing of the claim acceptance or refusal (rejection) promptly after completing the investigation, stating the following: for accepted claims (full or partial acceptance) — settlement amount, how the settlement amount was reached, justification if reduced settlement is offered or any part of the claim is not accepted; for denied or rejected claims — written reason for denying or rejecting the claim under question, copies of documents or information that were used in reaching the decision, if requested. j) Explain the appeal or complaints process, if the settlement is not accepted by the customer. k) For accepted claims, forward the claims settlement payment without undue delay upon receiving all required information and documentation (as per article 44 of the Implementing Regulations).
+
+Claims Settlement
+53. Insurance companies must settle claims within the time period indicated in article 44 of the Implementing Regulations, and when that is not possible, provide an explanation, with reason(s) for such delay.
+
+Complaints Handling
+55. Companies must put in place a fair, transparent, and accessible complaints handling process and controls, and inform customers of the complaints filing procedures.
+56. Upon receiving a complaint, companies must carryout the following: a) Acknowledge the receipt of the complaint. b) Provide an estimate of the time to address the complaint. c) Provide the customer with the contact reference to follow up on the filed complaint. d) Inform customers on the progress of the filed complaint. e) Address the complaints in a prompt and fair manner within ten (10) working days of receiving the complaint. f) Notify the customer, in writing, whether the complaint or the claim is accepted or rejected, and the underlying reasons for the decision and, if applicable, any offered compensation. g) Explain the dispute filing process to escalate the complaint or the claim to the committees established by article 20 of the law on supervision of cooperative insurance companies.
+
+Cancellation (mechanics)
+57. Cancellation of policies must conform to the cancellation conditions specified in the policy terms and conditions referred to in article 25. Cancellations by the insurance company must be notified to customers in writing, including a reference to the relevant contractual cancellation condition and explanation of the underlying reasons for the cancellation.
+58. Amounts due to customers as a result of the cancellation of a policy must be paid without undue delay, and must be calculated in accordance with the provisions of article 54 of the Implementing Regulations.
+
+Renewal and Expiry
+59. Companies must inform customers of the policy renewal or expiry date in a timely manner to allow customers to arrange continuing insurance coverage.
+60. For all protection and savings contracts, insurance companies should provide an annual statement to their customers which includes the following information: a) Projected maturity value, or policy value at the age of eighty-five (85). b) Current sum insured on main and supplementary benefits. c) Total premiums paid in the previous year. d) Policies linked to investment funds should show the value of the units in each fund.

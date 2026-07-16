@@ -127,6 +127,9 @@ export async function run(): Promise<void> {
     calculateFinancialMetrics(): FinancialMetrics {
       return { schemaVersion: "1.0" } as unknown as FinancialMetrics;
     },
+    async indexContractRagSession() {
+      return { sessionId: "fake-session-id" };
+    },
   };
 
   const req = createMockReq({ userSelectedContractType: "auto_finance", analysisLanguage: "ar" });
