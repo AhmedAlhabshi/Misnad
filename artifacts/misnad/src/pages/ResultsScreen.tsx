@@ -9,10 +9,11 @@ import OverviewTab from "@/components/results/OverviewTab";
 import ContractFinancesTab from "@/components/results/ContractFinancesTab";
 import FinancialAnalysisTab from "@/components/results/FinancialAnalysisTab";
 import ContractTab from "@/components/results/ContractTab";
+import ContractChat from "@/components/results/chat/ContractChat";
 
-type TabValue = "overview" | "finances" | "financialAnalysis" | "contract";
+type TabValue = "overview" | "finances" | "financialAnalysis" | "contract" | "chat";
 
-const TAB_VALUES: TabValue[] = ["overview", "finances", "financialAnalysis", "contract"];
+const TAB_VALUES: TabValue[] = ["overview", "finances", "financialAnalysis", "contract", "chat"];
 
 const TAB_TRIGGER_CLASS =
   "shrink-0 h-9 px-4 rounded-full bg-white/5 border border-white/10 text-white/70 data-[state=active]:bg-[linear-gradient(135deg,#6366F1,#8B5CF6)] data-[state=active]:text-white data-[state=active]:border-transparent data-[state=active]:shadow-none";
@@ -112,6 +113,15 @@ export default function ResultsScreen({
         </TabsContent>
         <TabsContent value="contract" className="mt-0 px-6 pt-5 pb-10 scroll-mt-32">
           <ContractTab contractObjectUrl={analysisResult.contractObjectUrl} language={lang} />
+        </TabsContent>
+        <TabsContent value="chat" className="mt-0 px-6 pt-5 pb-10 scroll-mt-32">
+          <ContractChat
+            language={lang}
+            contractType={analysisResult.selectedContractType}
+            contractRagSessionId={analysisResult.contractRagSessionId}
+            analysis={analysis}
+            financialMetrics={analysisResult.financialMetrics}
+          />
         </TabsContent>
       </Tabs>
     </motion.div>

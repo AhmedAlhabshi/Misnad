@@ -55,6 +55,13 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* V2-only semantic colors (no-op for V1, which never sets these vars). */
+  --color-v2-success: hsl(var(--v2-success));
+  --color-v2-warning: hsl(var(--v2-warning));
+  --color-v2-warning-foreground: hsl(var(--v2-warning-foreground));
+  --color-v2-info: hsl(var(--v2-info));
+  --color-v2-danger: hsl(var(--v2-danger));
 }
 
 :root, .dark {
@@ -106,6 +113,72 @@
   --sidebar-ring: 239 84% 67%;
   --app-font-sans: 'Cairo', sans-serif;
   --radius: 1.25rem;
+}
+
+/*
+ * Misnad V2 design tokens. Purely additive — every existing V1 rule above is
+ * untouched. Scoped to the .misnad-v2 root wrapper only, so V1 (which never
+ * carries this class) is visually unaffected. Every shadcn/ui primitive in
+ * src/components/ui/* is already written against these same semantic
+ * variable names, so wrapping the V2 tree in this class re-themes every
+ * reused primitive with zero component forks.
+ */
+.misnad-v2 {
+  --background: 210 20% 98%;
+  --foreground: 222 47% 11%;
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
+  --ring: 160 84% 24%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --card-border: 220 13% 91%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --popover-border: 220 13% 91%;
+
+  --primary: 160 84% 24%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 220 14% 96%;
+  --secondary-foreground: 222 47% 11%;
+
+  --muted: 220 14% 96%;
+  --muted-foreground: 220 9% 46%;
+
+  --accent: 221 70% 96%;
+  --accent-foreground: 221 65% 30%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+
+  --chart-1: 160 84% 24%;
+  --chart-2: 221 65% 52%;
+  --chart-3: 38 92% 50%;
+  --chart-4: 0 72% 51%;
+  --chart-5: 220 9% 46%;
+
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 222 47% 11%;
+  --sidebar-border: 220 13% 91%;
+  --sidebar-primary: 160 84% 24%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 220 14% 96%;
+  --sidebar-accent-foreground: 222 47% 11%;
+  --sidebar-ring: 160 84% 24%;
+
+  --app-font-sans: 'Cairo', sans-serif;
+  --radius: 0.625rem;
+
+  /* V2-only semantic tokens not part of the shared shadcn token set. */
+  --v2-success: 160 84% 24%;
+  --v2-warning: 38 92% 50%;
+  --v2-warning-foreground: 32 81% 29%;
+  --v2-info: 221 65% 52%;
+  --v2-danger: 0 72% 51%;
+
+  color-scheme: light;
 }
 
 @layer base {

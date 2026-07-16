@@ -1,0 +1,24 @@
+{
+  "name": "@workspace/answer-composer",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "tsx src/__tests__/citationAllowlist.test.ts && tsx src/__tests__/evidencePolicy.test.ts && tsx src/__tests__/contextSerializer.test.ts && tsx src/__tests__/answerPrompt.test.ts && tsx src/__tests__/responseSanitizer.test.ts && tsx src/__tests__/composer.routes.test.ts && tsx src/__tests__/composer.retryAndFallback.test.ts && tsx src/__tests__/composer.safety.test.ts && tsx src/__tests__/schema.validation.test.ts"
+  },
+  "dependencies": {
+    "@workspace/chat-router": "workspace:*",
+    "@workspace/context-builder": "workspace:*",
+    "@workspace/contract-analysis": "workspace:*",
+    "@workspace/contract-schema": "workspace:*",
+    "@workspace/contract-types": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "catalog:"
+  }
+}

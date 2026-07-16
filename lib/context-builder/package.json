@@ -1,0 +1,25 @@
+{
+  "name": "@workspace/context-builder",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "tsx src/__tests__/ranking.test.ts && tsx src/__tests__/budget.test.ts && tsx src/__tests__/financialCollector.test.ts && tsx src/__tests__/analysisCollector.test.ts && tsx src/__tests__/contractRetriever.test.ts && tsx src/__tests__/legalRetriever.test.ts && tsx src/__tests__/contextBuilder.routes.test.ts && tsx src/__tests__/contextBuilder.availability.test.ts && tsx src/__tests__/contextBuilder.rankingAndBudget.test.ts && tsx src/__tests__/schema.validation.test.ts"
+  },
+  "dependencies": {
+    "@workspace/chat-router": "workspace:*",
+    "@workspace/contract-rag": "workspace:*",
+    "@workspace/contract-schema": "workspace:*",
+    "@workspace/contract-types": "workspace:*",
+    "@workspace/financial-metrics": "workspace:*",
+    "@workspace/legal-rag": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "catalog:"
+  }
+}

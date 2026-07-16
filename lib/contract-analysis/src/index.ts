@@ -12,9 +12,11 @@ export type {
   ContractAnalysisProvider,
   ContractAnalysisProviderRequest,
   ContractAnalysisProviderResponse,
+  ProviderResponseDiagnostics,
 } from "./providers/types";
 
 export { geminiContractAnalysisProvider } from "./providers/geminiProvider";
+export { openRouterContractAnalysisProvider } from "./providers/openRouterProvider";
 
 export { analyzePersonalizedFinancialImpact } from "./personalizedAnalysisService";
 export type { AnalyzePersonalizedFinancialImpactOptions } from "./personalizedAnalysisService";

@@ -28,6 +28,7 @@ export interface ResultsCopy {
     finances: TabLabel;
     financialAnalysis: TabLabel;
     contract: TabLabel;
+    chat: TabLabel;
   };
 
   overview: {
@@ -129,6 +130,36 @@ export interface ResultsCopy {
     previousPage: string;
     nextPage: string;
   };
+
+  /**
+   * Copy for the "Ask Misnad" chat tab. Deliberately has no field for
+   * showing `route`, `confidence`, or `provider`/`model` prominently — per
+   * this feature's own requirement, those are either omitted or reduced to
+   * the two user-friendly warning strings below (`evidencePartialWarning`/
+   * `evidenceInsufficientWarning`), never a raw enum name.
+   */
+  chat: {
+    disclaimer: string;
+    inputPlaceholder: string;
+    inputAriaLabel: string;
+    send: string;
+    charactersRemainingTemplate: (remaining: number) => string;
+    overLimitMessage: string;
+    sessionUnavailableNotice: string;
+    loadingStages: string[];
+    suggestedTitle: string;
+    contractCitationLabel: string;
+    legalCitationLabel: string;
+    viewOfficialSource: string;
+    showExcerpt: string;
+    hideExcerpt: string;
+    evidencePartialWarning: string;
+    evidenceInsufficientWarning: string;
+    unavailableSourcesPrefix: string;
+    unavailableSourceLabels: { contract: string; legal: string; financial: string };
+    retryAction: string;
+    emptyStateHint: string;
+  };
 }
 
 const AR: ResultsCopy = {
@@ -142,6 +173,7 @@ const AR: ResultsCopy = {
     finances: { full: "أموالك في العقد", short: "أموالك" },
     financialAnalysis: { full: "التحليل المالي", short: "تحليلي" },
     contract: { full: "العقد", short: "العقد" },
+    chat: { full: "اسأل مِسناد", short: "اسأل مِسناد" },
   },
 
   overview: {
@@ -219,6 +251,29 @@ const AR: ResultsCopy = {
     previousPage: "الصفحة السابقة",
     nextPage: "الصفحة التالية",
   },
+
+  chat: {
+    disclaimer: "الإجابات مبنية على عقدك الذي تم تحليله والمصادر النظامية الرسمية فقط.",
+    inputPlaceholder: "اسأل عن عقدك، تكاليفه، أو الأنظمة المتعلقة به...",
+    inputAriaLabel: "اكتب سؤالك",
+    send: "إرسال",
+    charactersRemainingTemplate: (remaining) => `${remaining} حرفاً متبقياً`,
+    overLimitMessage: "السؤال طويل جداً. يرجى اختصاره.",
+    sessionUnavailableNotice: "الأسئلة المتعلقة بتفاصيل عقدك تحديداً غير متاحة مؤقتاً لهذه الجلسة. الأسئلة العامة والمتعلقة بالأنظمة قد تظل تعمل.",
+    loadingStages: ["جارٍ مراجعة المعلومات المرتبطة بسؤالك", "يراجع الأنظمة ذات العلاقة", "يصيغ إجابة موثقة"],
+    suggestedTitle: "أسئلة مقترحة",
+    contractCitationLabel: "من عقدك",
+    legalCitationLabel: "مرجع نظامي رسمي",
+    viewOfficialSource: "عرض المصدر الرسمي",
+    showExcerpt: "عرض النص",
+    hideExcerpt: "إخفاء النص",
+    evidencePartialWarning: "هذه الإجابة مبنية على جزء فقط من الأدلة المتاحة، وقد لا تكون كاملة.",
+    evidenceInsufficientWarning: "لا تتوفر أدلة كافية للإجابة على هذا السؤال بثقة. الإجابة أدناه للاسترشاد فقط وليست تأكيداً نظامياً.",
+    unavailableSourcesPrefix: "تعذّر الوصول إلى بعض المصادر لهذا السؤال:",
+    unavailableSourceLabels: { contract: "عقدك", legal: "المراجع النظامية", financial: "البيانات المالية" },
+    retryAction: "إعادة المحاولة",
+    emptyStateHint: "اطرح سؤالك أو اختر أحد الأسئلة المقترحة أدناه.",
+  },
 };
 
 const EN: ResultsCopy = {
@@ -232,6 +287,7 @@ const EN: ResultsCopy = {
     finances: { full: "Contract Finances", short: "Finances" },
     financialAnalysis: { full: "Financial Analysis", short: "My Analysis" },
     contract: { full: "Contract", short: "Contract" },
+    chat: { full: "Ask Misnad", short: "Ask Misnad" },
   },
 
   overview: {
@@ -308,6 +364,30 @@ const EN: ResultsCopy = {
     of: "of",
     previousPage: "Previous page",
     nextPage: "Next page",
+  },
+
+  chat: {
+    disclaimer: "Answers are based only on your analyzed contract and official Saudi legal sources.",
+    inputPlaceholder: "Ask about your contract, its costs, or applicable regulations...",
+    inputAriaLabel: "Type your question",
+    send: "Send",
+    charactersRemainingTemplate: (remaining) => `${remaining} characters remaining`,
+    overLimitMessage: "Your question is too long. Please shorten it.",
+    sessionUnavailableNotice:
+      "Questions specific to your contract's details aren't available for this session right now. General and regulation-related questions may still work.",
+    loadingStages: ["Searching your contract...", "Checking relevant regulations...", "Preparing a grounded answer..."],
+    suggestedTitle: "Suggested questions",
+    contractCitationLabel: "From your contract",
+    legalCitationLabel: "Official legal reference",
+    viewOfficialSource: "View official source",
+    showExcerpt: "Show text",
+    hideExcerpt: "Hide text",
+    evidencePartialWarning: "This answer is based on only part of the available evidence and may be incomplete.",
+    evidenceInsufficientWarning: "There isn't enough evidence to answer this confidently. The answer below is for guidance only, not a legal determination.",
+    unavailableSourcesPrefix: "Some sources couldn't be reached for this question:",
+    unavailableSourceLabels: { contract: "your contract", legal: "legal references", financial: "financial data" },
+    retryAction: "Retry",
+    emptyStateHint: "Ask your question or pick one of the suggested questions below.",
   },
 };
 

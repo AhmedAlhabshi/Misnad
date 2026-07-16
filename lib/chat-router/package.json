@@ -1,0 +1,20 @@
+{
+  "name": "@workspace/chat-router",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "tsx src/__tests__/normalize.test.ts && tsx src/__tests__/signals.test.ts && tsx src/__tests__/routing.arabic.test.ts && tsx src/__tests__/routing.english.test.ts && tsx src/__tests__/routing.availability.test.ts && tsx src/__tests__/routing.safety.test.ts && tsx src/__tests__/routing.contractDates.test.ts && tsx src/__tests__/schema.validation.test.ts"
+  },
+  "dependencies": {
+    "@workspace/contract-types": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "catalog:"
+  }
+}

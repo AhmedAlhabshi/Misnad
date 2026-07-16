@@ -28,6 +28,15 @@
       "path": "./lib/contract-rag"
     },
     {
+      "path": "./lib/chat-router"
+    },
+    {
+      "path": "./lib/context-builder"
+    },
+    {
+      "path": "./lib/answer-composer"
+    },
+    {
       "path": "./lib/api-client-react"
     },
     {

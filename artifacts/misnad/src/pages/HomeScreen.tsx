@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import {
   Upload,
   Shield,
-  Archive,
   Sparkles,
   Car,
   CreditCard,
@@ -226,20 +225,9 @@ export default function HomeScreen({
       </motion.button>
 
       {/* Privacy Note */}
-      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-[-10px]">
+      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-[-10px] pb-4">
         <Shield size={14} className="text-emerald-500" />
         <span>ملفك لا يُخزّن — يُحلّل ويُحذف فوراً</span>
-      </div>
-
-      <div className="mt-auto pt-6 flex justify-center pb-4">
-        <button
-          onClick={() => onNavigate("archive")}
-          data-testid="link-archive"
-          className="flex items-center gap-2 text-sm text-indigo-400 font-semibold hover:text-indigo-300 transition-colors"
-        >
-          <Archive size={16} />
-          <span>عقودي المحفوظة</span>
-        </button>
       </div>
     </motion.div>
   );

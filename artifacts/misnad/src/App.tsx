@@ -5,7 +5,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import HomeScreen from "./pages/HomeScreen";
 import LoadingScreen from "./pages/LoadingScreen";
 import ResultsScreen from "./pages/ResultsScreen";
-import ArchiveScreen from "./pages/ArchiveScreen";
 import type { PendingUpload, StoredAnalysisResult } from "@/types/analysis";
 
 function App() {
@@ -51,7 +50,6 @@ function App() {
           {currentScreen === "results" && (
             <ResultsScreen key="results" onNavigate={setCurrentScreen} analysisResult={analysisResult} />
           )}
-          {currentScreen === "archive" && <ArchiveScreen key="archive" onNavigate={setCurrentScreen} />}
         </AnimatePresence>
       </div>
       <Toaster />
