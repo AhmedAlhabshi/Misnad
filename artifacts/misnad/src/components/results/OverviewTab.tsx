@@ -1,39 +1,12 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Sparkles, Users } from "lucide-react";
-import { CONTRACT_TYPE_LABELS_AR, CONTRACT_TYPE_LABELS_EN, type AnalysisLanguage, type ContractType } from "@workspace/contract-types";
+import type { AnalysisLanguage } from "@workspace/contract-types";
 import type { ContractAnalysisResult, ImportantClause } from "@/types/analysis";
 import { RESULTS_COPY } from "@/lib/resultsCopy";
 import { sanitizeDisplayText } from "@/lib/textSanitization";
 import { deduplicateClauses } from "@/lib/clauseDedup";
-
-/** Real, present typeDetails fields that can meaningfully identify *this* contract — never fabricated. */
-const DESCRIPTOR_FIELDS: Partial<Record<ContractType, string[]>> = {
-  lease: ["propertyAddress"],
-  mortgage: ["propertyAddress"],
-  auto_finance: ["vehicleMake", "vehicleModel", "vehicleYear"],
-  insurance: ["insuranceType"],
-  employment: ["jobTitle"],
-  subscription: ["serviceName"],
-};
-
-interface ContractTitleParts {
-  typeLabel: string;
-  /** A real, present typeDetails value (e.g. a vehicle make/model/year) — may mix scripts/digits, so it's rendered in its own bidi-isolated span, never concatenated into the title string. */
-  descriptor: string | null;
-}
-
-function buildContractTitleParts(analysis: ContractAnalysisResult, language: AnalysisLanguage): ContractTitleParts {
-  const typeLabel = language === "ar" ? CONTRACT_TYPE_LABELS_AR[analysis.contractType] : CONTRACT_TYPE_LABELS_EN[analysis.contractType];
-  const fields = DESCRIPTOR_FIELDS[analysis.contractType] ?? [];
-  const descriptor = fields
-    .map((field) => analysis.typeDetails[field])
-    .filter((value): value is string | number => (typeof value === "string" && value.trim().length > 0) || typeof value === "number")
-    .map((value) => sanitizeDisplayText(String(value)))
-    .filter((value): value is string => value !== null)
-    .join(" ");
-  return { typeLabel, descriptor: descriptor || null };
-}
+import { buildContractTitleParts } from "@/lib/contractTitle";
 
 function ClauseAccordionItem({
   clause,

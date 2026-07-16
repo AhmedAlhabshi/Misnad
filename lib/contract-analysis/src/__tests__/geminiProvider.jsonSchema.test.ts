@@ -30,6 +30,11 @@ export function run(): void {
     65536,
     "maxOutputTokens must be 65536 (gemini-2.5-flash's documented output limit) to avoid truncating large real-contract structured output (raised from 16384 after live MAX_TOKENS failures)",
   );
+  assert.equal(
+    withSchema.config.temperature,
+    0,
+    "temperature must be 0 for deterministic structured extraction",
+  );
 
   const withoutSchema = buildGenerateContentParams("gemini-2.5-flash", {
     systemInstructions: "sys",

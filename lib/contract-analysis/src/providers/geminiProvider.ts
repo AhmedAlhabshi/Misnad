@@ -180,6 +180,11 @@ export function buildGenerateContentParams(
         ? { responseJsonSchema: sanitizeJsonSchemaForGemini(request.jsonSchema) }
         : {}),
       maxOutputTokens: GEMINI_MAX_OUTPUT_TOKENS,
+      // Structured extraction (clause boundaries, amounts, dates) must be as
+      // reproducible as possible across runs — temperature 0 removes sampling
+      // as a source of run-to-run variance (see clausePostProcessing.ts for
+      // why this alone isn't sufficient and what backstops it).
+      temperature: 0,
     },
   };
 }

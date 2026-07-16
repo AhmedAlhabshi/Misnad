@@ -4,21 +4,14 @@ import type { FinancialMetrics } from "@workspace/financial-metrics";
 import type { ContractAnalysisResult } from "@/types/analysis";
 import { RESULTS_COPY } from "@/lib/resultsCopy";
 import { formatMoneyMetric, type MoneyMetricLike } from "@/lib/financialFormatters";
-import { calculateBudgetImpact, hasMinimumBudgetInputs, parseBudgetInputValue, type BudgetImpactResult } from "@/lib/budgetImpact";
+import { calculateBudgetImpact, hasMinimumBudgetInputs, parseBudgetInputValue } from "@/lib/budgetImpact";
 import { buildFinancialConcepts, selectApplicableMonthlyOutflow, selectApplicableUpfrontLiquidity } from "@/lib/financialConcepts";
+import { fetchPersonalizedAnalysis } from "@/lib/personalizedAnalysisApi";
+import type { PersonalizedAnalysisSession } from "@/hooks/usePersonalizedAnalysisSession";
 import Accordion from "./shared/Accordion";
 import PersonalizedAnalysisSection from "./PersonalizedAnalysisSection";
 
 const PERCENT_SIGN: Record<AnalysisLanguage, string> = { ar: "٪", en: "%" };
-
-interface FormState {
-  monthlyIncome: string;
-  essentialExpenses: string;
-  existingDebt: string;
-  savings: string;
-}
-
-const EMPTY_FORM: FormState = { monthlyIncome: "", essentialExpenses: "", existingDebt: "", savings: "" };
 
 function moneyText(value: number | null, currency: string | null, language: AnalysisLanguage): string | null {
   if (value === null) return null;
@@ -39,14 +32,17 @@ export default function FinancialAnalysisTab({
   analysis,
   financialMetrics,
   language,
+  session,
 }: {
   analysis: ContractAnalysisResult;
   financialMetrics: FinancialMetrics | null;
   language: AnalysisLanguage;
+  /** Durable personalized-analysis session state, owned by the nearest parent that survives result-tab switches — see `usePersonalizedAnalysisSession`. */
+  session: PersonalizedAnalysisSession;
 }) {
   const copy = RESULTS_COPY[language];
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [result, setResult] = useState<BudgetImpactResult | null>(null);
+  const form = session.state.form;
+  const result = session.state.budgetResult;
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["budgetImpact"]));
 
   function toggleSection(key: string) {
@@ -79,16 +75,42 @@ export default function FinancialAnalysisTab({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSubmit || monthlyIncome === null || essentialExpenses === null || existingDebt === null) return;
-    setResult(
-      calculateBudgetImpact(
-        { monthlyIncome, essentialExpenses, existingMonthlyDebt: existingDebt, savings },
-        { monthlyCommitment, upfrontCosts },
-      ),
+
+    const budgetResult = calculateBudgetImpact(
+      { monthlyIncome, essentialExpenses, existingMonthlyDebt: existingDebt, savings },
+      { monthlyCommitment, upfrontCosts },
     );
+    session.setBudgetResult(budgetResult);
+
+    // Runs exactly once per real submission — never re-triggered merely by
+    // this component remounting when the user returns to this tab (see
+    // usePersonalizedAnalysisSession's doc comment).
+    session.startPersonalizedAnalysis();
+    fetchPersonalizedAnalysis({
+      language,
+      analysis,
+      concepts,
+      currency,
+      applicableMonthlyOutflow: monthlyCommitment,
+      applicableUpfrontLiquidity: upfrontCosts,
+      budgetInputs: { monthlyIncome, essentialExpenses, existingMonthlyDebt: existingDebt, savings },
+      availableBeforeContract: budgetResult.availableBeforeContract,
+      availableAfterContract: budgetResult.availableAfterContract,
+      contractIncomeRatio: budgetResult.contractIncomeRatio,
+      totalCommitmentRatio: budgetResult.totalCommitmentRatio,
+      remainingSavings: budgetResult.remainingSavings,
+      emergencyCoverageMonths: budgetResult.emergencyCoverageMonths,
+    }).then((outcome) => {
+      if (outcome.success) {
+        session.setPersonalizedAnalysisResult(outcome.data);
+      } else {
+        session.setPersonalizedAnalysisUnavailable();
+      }
+    });
   }
 
   function handleEdit() {
-    setResult(null);
+    session.resetBudgetResult();
   }
 
   if (!result) {
@@ -108,7 +130,7 @@ export default function FinancialAnalysisTab({
               inputMode="decimal"
               data-testid="input-monthly-income"
               value={form.monthlyIncome}
-              onChange={(e) => setForm((f) => ({ ...f, monthlyIncome: e.target.value }))}
+              onChange={(e) => { const value = e.target.value; session.setForm((f) => ({ ...f, monthlyIncome: value })); }}
               className="h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-white text-[14px] outline-none focus:border-indigo-400"
             />
           </label>
@@ -121,7 +143,7 @@ export default function FinancialAnalysisTab({
               inputMode="decimal"
               data-testid="input-essential-expenses"
               value={form.essentialExpenses}
-              onChange={(e) => setForm((f) => ({ ...f, essentialExpenses: e.target.value }))}
+              onChange={(e) => { const value = e.target.value; session.setForm((f) => ({ ...f, essentialExpenses: value })); }}
               className="h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-white text-[14px] outline-none focus:border-indigo-400"
             />
           </label>
@@ -134,7 +156,7 @@ export default function FinancialAnalysisTab({
               inputMode="decimal"
               data-testid="input-existing-debt"
               value={form.existingDebt}
-              onChange={(e) => setForm((f) => ({ ...f, existingDebt: e.target.value }))}
+              onChange={(e) => { const value = e.target.value; session.setForm((f) => ({ ...f, existingDebt: value })); }}
               className="h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-white text-[14px] outline-none focus:border-indigo-400"
             />
           </label>
@@ -149,7 +171,7 @@ export default function FinancialAnalysisTab({
               inputMode="decimal"
               data-testid="input-savings"
               value={form.savings}
-              onChange={(e) => setForm((f) => ({ ...f, savings: e.target.value }))}
+              onChange={(e) => { const value = e.target.value; session.setForm((f) => ({ ...f, savings: value })); }}
               className="h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-white text-[14px] outline-none focus:border-indigo-400"
             />
           </label>
@@ -232,26 +254,7 @@ export default function FinancialAnalysisTab({
         </div>
       </Accordion>
 
-      <PersonalizedAnalysisSection
-        language={language}
-        analysis={analysis}
-        concepts={concepts}
-        currency={currency}
-        applicableMonthlyOutflow={applicableMonthlyOutflow?.value ?? null}
-        applicableUpfrontLiquidity={applicableUpfrontLiquidity?.value ?? null}
-        budgetInputs={{
-          monthlyIncome: monthlyIncome as number,
-          essentialExpenses: essentialExpenses as number,
-          existingMonthlyDebt: existingDebt as number,
-          savings,
-        }}
-        availableBeforeContract={result.availableBeforeContract}
-        availableAfterContract={result.availableAfterContract}
-        contractIncomeRatio={result.contractIncomeRatio}
-        totalCommitmentRatio={result.totalCommitmentRatio}
-        remainingSavings={result.remainingSavings}
-        emergencyCoverageMonths={result.emergencyCoverageMonths}
-      />
+      <PersonalizedAnalysisSection language={language} status={session.state.status} data={session.state.result} />
     </div>
   );
 }

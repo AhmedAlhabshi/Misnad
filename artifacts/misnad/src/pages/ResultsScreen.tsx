@@ -1,15 +1,18 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ChevronRight, FileWarning } from "lucide-react";
+import { ChevronRight, Download, FileWarning } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RESULTS_COPY } from "@/lib/resultsCopy";
+import { REPORT_SUMMARY_COPY } from "@/lib/reportSummaryCopy";
 import { getSafeFileNameDisplay } from "@/lib/safeFileName";
 import type { StoredAnalysisResult } from "@/types/analysis";
+import { usePersonalizedAnalysisSession } from "@/hooks/usePersonalizedAnalysisSession";
 import OverviewTab from "@/components/results/OverviewTab";
 import ContractFinancesTab from "@/components/results/ContractFinancesTab";
 import FinancialAnalysisTab from "@/components/results/FinancialAnalysisTab";
 import ContractTab from "@/components/results/ContractTab";
 import ContractChat from "@/components/results/chat/ContractChat";
+import ReportDownloadDialog from "@/components/results/ReportDownloadDialog";
 
 type TabValue = "overview" | "finances" | "financialAnalysis" | "contract" | "chat";
 
@@ -31,7 +34,20 @@ export default function ResultsScreen({
   const analysis = analysisResult?.analysis ?? null;
   const triggerRefs = useRef<Partial<Record<TabValue, HTMLButtonElement | null>>>({});
 
+  // Owned here — the nearest parent that stays mounted while the user
+  // switches between result tabs — so the Personalized Analysis form and
+  // its AI result survive tab navigation instead of being destroyed by
+  // Radix's TabsContent unmounting inactive panels (see
+  // usePersonalizedAnalysisSession's doc comment for the full rationale).
+  // Keyed on `analysisResult` itself: a new analysis produces a new
+  // `analysisResult` object, which resets this state to a fresh session.
+  const personalizedAnalysisSession = usePersonalizedAnalysisSession(analysisResult);
+  const [activeTab, setActiveTab] = useState<TabValue>("overview");
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
+  const reportCopy = REPORT_SUMMARY_COPY[lang];
+
   function handleTabChange(value: string) {
+    setActiveTab(value as TabValue);
     window.scrollTo({ top: 0, behavior: "smooth" });
     requestAnimationFrame(() => {
       triggerRefs.current[value as TabValue]?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
@@ -79,12 +95,21 @@ export default function ResultsScreen({
           <ChevronRight size={16} className={isAr ? "" : "rotate-180"} />
           <span>{copy.back}</span>
         </button>
-        <span dir="auto" className="text-xs text-muted-foreground truncate max-w-[45%]">
+        <span dir="auto" className="text-xs text-muted-foreground truncate max-w-[35%]">
           {safeFileName}
         </span>
+        <button
+          onClick={() => setIsReportDialogOpen(true)}
+          data-testid="button-open-report-dialog"
+          title={reportCopy.downloadButton}
+          aria-label={reportCopy.downloadButton}
+          className="h-8 w-8 shrink-0 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white"
+        >
+          <Download size={14} />
+        </button>
       </div>
 
-      <Tabs defaultValue="overview" onValueChange={handleTabChange} className="flex flex-col">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="flex flex-col">
         <TabsList className="hide-scrollbar flex w-full max-w-full h-auto justify-start bg-transparent p-0 gap-2 px-6 pt-4 overflow-x-auto overflow-y-hidden flex-nowrap sticky top-16 z-10 scroll-mt-16 bg-[#0D1117]/80 backdrop-blur-md pb-3 border-b border-white/5 rounded-none">
           {TAB_VALUES.map((value) => (
             <TabsTrigger
@@ -109,7 +134,12 @@ export default function ResultsScreen({
           <ContractFinancesTab analysis={analysis} financialMetrics={analysisResult.financialMetrics} language={lang} />
         </TabsContent>
         <TabsContent value="financialAnalysis" className="mt-0 px-6 pt-5 pb-10 scroll-mt-32">
-          <FinancialAnalysisTab analysis={analysis} financialMetrics={analysisResult.financialMetrics} language={lang} />
+          <FinancialAnalysisTab
+            analysis={analysis}
+            financialMetrics={analysisResult.financialMetrics}
+            language={lang}
+            session={personalizedAnalysisSession}
+          />
         </TabsContent>
         <TabsContent value="contract" className="mt-0 px-6 pt-5 pb-10 scroll-mt-32">
           <ContractTab contractObjectUrl={analysisResult.contractObjectUrl} language={lang} />
@@ -124,6 +154,17 @@ export default function ResultsScreen({
           />
         </TabsContent>
       </Tabs>
+
+      <ReportDownloadDialog
+        open={isReportDialogOpen}
+        onOpenChange={setIsReportDialogOpen}
+        language={lang}
+        contractType={analysisResult.selectedContractType}
+        analysis={analysis}
+        financialMetrics={analysisResult.financialMetrics}
+        personalizedSessionState={personalizedAnalysisSession.state}
+        onNavigateToPersonalizedAnalysis={() => setActiveTab("financialAnalysis")}
+      />
     </motion.div>
   );
 }

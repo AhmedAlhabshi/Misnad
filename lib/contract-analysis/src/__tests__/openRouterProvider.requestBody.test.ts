@@ -30,6 +30,11 @@ export function run(): void {
     65536,
     "max_tokens must match the current Gemini maxOutputTokens budget",
   );
+  assert.equal(
+    body.temperature,
+    0,
+    "temperature must be 0 for deterministic structured extraction",
+  );
 
   console.log("PASS openRouterProvider.requestBody.test.ts");
 }

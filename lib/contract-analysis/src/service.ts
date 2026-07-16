@@ -17,6 +17,7 @@ import {
 } from "./errors";
 import { buildAnalysisPrompt, buildCorrectionPrompt, SYSTEM_INSTRUCTIONS, type DeterministicRecoveryNote } from "./promptBuilder";
 import { parseJsonResponse, validateContractUnderstanding } from "./validate";
+import { applyDeterministicClausePostProcessing } from "./clausePostProcessing";
 import type { ContractAnalysisProvider, ProviderResponseDiagnostics } from "./providers/types";
 import { geminiContractAnalysisProvider } from "./providers/geminiProvider";
 import { openRouterContractAnalysisProvider } from "./providers/openRouterProvider";
@@ -120,7 +121,7 @@ async function runAnalysisAttempts(
   const firstAttempt = tryValidate(firstResponse.rawText, maskedText);
 
   if (firstAttempt.success && firstAttempt.data) {
-    return firstAttempt.data;
+    return withPostProcessedClauses(firstAttempt.data, maskedText);
   }
 
   logValidationDiagnostic(
@@ -147,7 +148,7 @@ async function runAnalysisAttempts(
   const secondAttempt = tryValidate(correctionResponse.rawText, maskedText);
 
   if (secondAttempt.success && secondAttempt.data) {
-    return secondAttempt.data;
+    return withPostProcessedClauses(secondAttempt.data, maskedText);
   }
 
   logValidationDiagnostic(
@@ -158,6 +159,20 @@ async function runAnalysisAttempts(
   );
 
   throw schemaValidationFailedError();
+}
+
+/**
+ * Applies the deterministic clause post-processing pipeline (see
+ * `clausePostProcessing.ts`) to a validated response before it is returned.
+ * Runs on every successful attempt (initial and correction alike) so clause
+ * count/boundaries are consistent regardless of which attempt or provider
+ * produced the underlying response.
+ */
+function withPostProcessedClauses(data: ContractUnderstanding, maskedText: string): ContractUnderstanding {
+  return {
+    ...data,
+    importantClauses: applyDeterministicClausePostProcessing(data.importantClauses, maskedText),
+  };
 }
 
 const DIAGNOSTIC_PREVIEW_CHARS = 300;

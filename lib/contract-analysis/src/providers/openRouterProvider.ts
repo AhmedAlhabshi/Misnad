@@ -75,6 +75,10 @@ export function buildOpenRouterRequestBody(
     ],
     response_format: { type: "json_object" as const },
     max_tokens: OPENROUTER_MAX_OUTPUT_TOKENS,
+    // Same determinism rationale as geminiProvider.ts's temperature: 0 — most
+    // OpenRouter-routed models (including the qwen fallback) support this
+    // standard OpenAI-compatible field.
+    temperature: 0,
   };
 }
 
