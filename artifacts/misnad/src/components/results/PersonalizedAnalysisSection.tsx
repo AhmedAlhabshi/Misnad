@@ -19,10 +19,13 @@ export default function PersonalizedAnalysisSection({
   language,
   status,
   data,
+  onRetry,
 }: {
   language: AnalysisLanguage;
   status: PersonalizedAnalysisStatus;
   data: PersonalizedAnalysisResponse | null;
+  /** Re-runs the same personalized-analysis request. Only ever rendered when `status === "unavailable"` (a failure, including a total-timeout). */
+  onRetry: () => void;
 }) {
   const copy = RESULTS_COPY[language].financialAnalysis.personalizedAnalysis;
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -52,10 +55,18 @@ export default function PersonalizedAnalysisSection({
     return (
       <div
         dir={language === "ar" ? "rtl" : "ltr"}
-        className="flex flex-col items-center justify-center gap-2 py-8 text-center"
+        className="flex flex-col items-center justify-center gap-3 py-8 text-center"
         data-testid="personalized-analysis-unavailable"
       >
         <p className="text-[13px] text-muted-foreground">{copy.unavailable}</p>
+        <button
+          type="button"
+          onClick={onRetry}
+          data-testid="button-retry-personalized-analysis"
+          className="h-9 px-4 rounded-full bg-white/5 border border-white/10 text-[12px] font-semibold text-white"
+        >
+          {copy.retryAction}
+        </button>
       </div>
     );
   }

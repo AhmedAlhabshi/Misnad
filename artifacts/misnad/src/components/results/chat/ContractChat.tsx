@@ -55,6 +55,13 @@ export default function ContractChat({
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  // Synchronous guard, independent of the `isSending` state's render/commit
+  // timing — `canSendQuestion(input, isSending)` is the primary gate (and
+  // disables the send button/Enter), but this ref is a zero-cost second
+  // line of defense so no possible sequence of calls into `submitQuestion`
+  // (a re-render, a double-invoked handler, a future caller) can ever start
+  // a second fetch for the same in-flight request.
+  const requestInFlightRef = useRef(false);
 
   // Explicit, direct reset — never relies solely on this component
   // happening to unmount when the session changes (see the requirement
@@ -63,6 +70,7 @@ export default function ContractChat({
     setMessages([]);
     setInput("");
     setIsSending(false);
+    requestInFlightRef.current = false;
   }, [contractRagSessionId]);
 
   useEffect(() => {
@@ -72,9 +80,10 @@ export default function ContractChat({
   }, [messages.length, isSending]);
 
   async function submitQuestion(rawQuestion: string) {
-    if (!canSendQuestion(rawQuestion, isSending)) {
+    if (!canSendQuestion(rawQuestion, isSending) || requestInFlightRef.current) {
       return;
     }
+    requestInFlightRef.current = true;
     const question = rawQuestion.trim();
 
     setMessages((prev) => [...prev, { id: generateMessageId(), role: "user", text: question, timestamp: Date.now() }]);
@@ -112,6 +121,7 @@ export default function ContractChat({
           },
     ]);
     setIsSending(false);
+    requestInFlightRef.current = false;
   }
 
   function handleSendFromInput() {

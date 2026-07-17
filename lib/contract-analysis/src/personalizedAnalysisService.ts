@@ -74,6 +74,7 @@ async function runPersonalizedAnalysisAttempts(
     systemInstructions: PERSONALIZED_ANALYSIS_SYSTEM_INSTRUCTIONS,
     userPrompt: buildPersonalizedAnalysisPrompt(request),
     jsonSchema: RESPONSE_JSON_SCHEMA,
+    context: "personalizedAnalysis",
   });
 
   const firstAttempt = tryValidate(firstResponse.rawText);
@@ -96,6 +97,7 @@ async function runPersonalizedAnalysisAttempts(
       validationErrorSummary: firstAttempt.errorSummary ?? "The response was not valid JSON.",
     }),
     jsonSchema: RESPONSE_JSON_SCHEMA,
+    context: "personalizedAnalysis",
   });
 
   const secondAttempt = tryValidate(correctionResponse.rawText);

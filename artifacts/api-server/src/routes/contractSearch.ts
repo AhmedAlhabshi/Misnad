@@ -23,7 +23,7 @@ export interface ContractSearchHandlerDeps {
 
 const defaultDeps: ContractSearchHandlerDeps = {
   repository: new PostgresContractRagRepository(),
-  embeddingProvider: new GeminiEmbeddingProvider(),
+  embeddingProvider: new GeminiEmbeddingProvider({ context: "contractSearch" }),
 };
 
 /**

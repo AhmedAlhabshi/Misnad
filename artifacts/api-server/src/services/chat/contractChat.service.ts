@@ -113,9 +113,15 @@ async function executeContractChat(request: ContractChatRequest, deps: ContractC
   });
 
   const contractRagDeps: ContractRetrieverDeps =
-    deps.contractRag ?? { repository: new PostgresContractRagRepository(), embeddingProvider: new GeminiEmbeddingProvider() };
+    deps.contractRag ?? {
+      repository: new PostgresContractRagRepository(),
+      embeddingProvider: new GeminiEmbeddingProvider({ context: "contractRag" }),
+    };
   const legalRagDeps: LegalRetrieverDeps =
-    deps.legalRag ?? { repository: new PostgresLegalChunkRepository(), embeddingProvider: new GeminiEmbeddingProvider() };
+    deps.legalRag ?? {
+      repository: new PostgresLegalChunkRepository(),
+      embeddingProvider: new GeminiEmbeddingProvider({ context: "legalRag" }),
+    };
 
   // Step 4: the grounded context — built only from the router's own
   // decision and the already-validated request data (contractRagSessionId,

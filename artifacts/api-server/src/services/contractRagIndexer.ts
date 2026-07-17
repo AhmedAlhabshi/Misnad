@@ -18,7 +18,7 @@ export async function indexContractRagSession(
   analysisLanguage: AnalysisLanguage,
 ): Promise<ContractRagIndexResult> {
   const repository = new PostgresContractRagRepository();
-  const embeddingProvider = new GeminiEmbeddingProvider();
+  const embeddingProvider = new GeminiEmbeddingProvider({ context: "contractRagIndex" });
   const result = await indexContractSession({ maskedDocument, contractType, analysisLanguage }, { repository, embeddingProvider });
   return { sessionId: result.sessionId };
 }

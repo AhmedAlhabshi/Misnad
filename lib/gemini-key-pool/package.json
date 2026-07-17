@@ -1,0 +1,16 @@
+{
+  "name": "@workspace/gemini-key-pool",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "tsx src/__tests__/env.parsing.test.ts && tsx src/__tests__/geminiKeyPool.behavior.test.ts && tsx src/__tests__/diagnostics.safety.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "catalog:"
+  }
+}

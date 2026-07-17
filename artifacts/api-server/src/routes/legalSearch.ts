@@ -26,7 +26,7 @@ export interface LegalSearchHandlerDeps {
 
 const defaultDeps: LegalSearchHandlerDeps = {
   repository: new PostgresLegalChunkRepository(),
-  embeddingProvider: new GeminiEmbeddingProvider(),
+  embeddingProvider: new GeminiEmbeddingProvider({ context: "legalSearch" }),
 };
 
 /**

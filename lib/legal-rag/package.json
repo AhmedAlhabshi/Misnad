@@ -7,12 +7,13 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "tsx src/__tests__/manifest.validation.test.ts && tsx src/__tests__/registry.modularity.test.ts && tsx src/__tests__/chunker.articleStructure.test.ts && tsx src/__tests__/chunker.checksum.test.ts && tsx src/__tests__/embeddings.fakeProvider.test.ts && tsx src/__tests__/ingestion.orchestrate.test.ts && tsx src/__tests__/retrieval.filtering.test.ts && tsx src/__tests__/retrieval.samaFixtures.test.ts && tsx src/__tests__/retrieval.newCollections.test.ts && tsx src/__tests__/citations.validate.test.ts && tsx src/__tests__/apiSchema.validation.test.ts"
+    "test": "tsx src/__tests__/manifest.validation.test.ts && tsx src/__tests__/registry.modularity.test.ts && tsx src/__tests__/chunker.articleStructure.test.ts && tsx src/__tests__/chunker.checksum.test.ts && tsx src/__tests__/embeddings.fakeProvider.test.ts && tsx src/__tests__/geminiEmbeddingProvider.keyPool.test.ts && tsx src/__tests__/ingestion.orchestrate.test.ts && tsx src/__tests__/retrieval.filtering.test.ts && tsx src/__tests__/retrieval.samaFixtures.test.ts && tsx src/__tests__/retrieval.newCollections.test.ts && tsx src/__tests__/citations.validate.test.ts && tsx src/__tests__/apiSchema.validation.test.ts"
   },
   "dependencies": {
     "@google/genai": "^1.30.0",
     "@workspace/contract-types": "workspace:*",
     "@workspace/db": "workspace:*",
+    "@workspace/gemini-key-pool": "workspace:*",
     "drizzle-orm": "catalog:",
     "zod": "catalog:"
   },

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { AnalysisLanguage } from "@workspace/contract-types";
 import type { FinancialMetrics } from "@workspace/financial-metrics";
 import type { ContractAnalysisResult } from "@/types/analysis";
@@ -44,6 +44,14 @@ export default function FinancialAnalysisTab({
   const form = session.state.form;
   const result = session.state.budgetResult;
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["budgetImpact"]));
+  // Synchronous guard against a duplicate in-flight personalized-analysis
+  // request — e.g. a fast double-click on "Retry", or any rerender/tab
+  // switch that might otherwise re-invoke the submit/retry handler while a
+  // previous request is still pending. `session.state.status === "loading"`
+  // alone isn't enough since it updates via React state (not synchronous
+  // with the click that triggers it) — same rationale as ContractChat's
+  // `requestInFlightRef`.
+  const requestInFlightRef = useRef(false);
 
   function toggleSection(key: string) {
     setExpandedSections((prev) => {
@@ -72,19 +80,24 @@ export default function FinancialAnalysisTab({
     existingMonthlyDebt: existingDebt ?? undefined,
   });
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!canSubmit || monthlyIncome === null || essentialExpenses === null || existingDebt === null) return;
+  /**
+   * Fires the actual personalized-analysis request against an already-set
+   * budget result. Shared by the initial submission and the retry button —
+   * guarded by `requestInFlightRef` so neither path can ever start a second
+   * request while one is still pending.
+   */
+  function runPersonalizedAnalysis(budgetResult: NonNullable<typeof result>) {
+    if (requestInFlightRef.current) {
+      return;
+    }
+    // `handleSubmit`'s null-check on these doesn't narrow them here — they're
+    // read as closures over the outer component scope, not through the call
+    // site — so they're re-checked directly in this function's own scope.
+    if (monthlyIncome === null || essentialExpenses === null || existingDebt === null) {
+      return;
+    }
+    requestInFlightRef.current = true;
 
-    const budgetResult = calculateBudgetImpact(
-      { monthlyIncome, essentialExpenses, existingMonthlyDebt: existingDebt, savings },
-      { monthlyCommitment, upfrontCosts },
-    );
-    session.setBudgetResult(budgetResult);
-
-    // Runs exactly once per real submission — never re-triggered merely by
-    // this component remounting when the user returns to this tab (see
-    // usePersonalizedAnalysisSession's doc comment).
     session.startPersonalizedAnalysis();
     fetchPersonalizedAnalysis({
       language,
@@ -101,12 +114,36 @@ export default function FinancialAnalysisTab({
       remainingSavings: budgetResult.remainingSavings,
       emergencyCoverageMonths: budgetResult.emergencyCoverageMonths,
     }).then((outcome) => {
+      requestInFlightRef.current = false;
       if (outcome.success) {
         session.setPersonalizedAnalysisResult(outcome.data);
       } else {
         session.setPersonalizedAnalysisUnavailable();
       }
     });
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canSubmit || monthlyIncome === null || essentialExpenses === null || existingDebt === null) return;
+
+    const budgetResult = calculateBudgetImpact(
+      { monthlyIncome, essentialExpenses, existingMonthlyDebt: existingDebt, savings },
+      { monthlyCommitment, upfrontCosts },
+    );
+    session.setBudgetResult(budgetResult);
+
+    // Runs exactly once per real submission — never re-triggered merely by
+    // this component remounting when the user returns to this tab (see
+    // usePersonalizedAnalysisSession's doc comment).
+    runPersonalizedAnalysis(budgetResult);
+  }
+
+  function handleRetryPersonalizedAnalysis() {
+    if (!result) {
+      return;
+    }
+    runPersonalizedAnalysis(result);
   }
 
   function handleEdit() {
@@ -254,7 +291,12 @@ export default function FinancialAnalysisTab({
         </div>
       </Accordion>
 
-      <PersonalizedAnalysisSection language={language} status={session.state.status} data={session.state.result} />
+      <PersonalizedAnalysisSection
+        language={language}
+        status={session.state.status}
+        data={session.state.result}
+        onRetry={handleRetryPersonalizedAnalysis}
+      />
     </div>
   );
 }

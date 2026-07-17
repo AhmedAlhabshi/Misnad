@@ -4,7 +4,8 @@ export type EmbeddingErrorCode =
   | "INPUT_TOO_LARGE"
   | "PROVIDER_REQUEST_FAILED"
   | "DIMENSION_MISMATCH"
-  | "NO_USABLE_EMBEDDING";
+  | "NO_USABLE_EMBEDDING"
+  | "RATE_LIMITED";
 
 export class EmbeddingError extends Error {
   public readonly code: EmbeddingErrorCode;
@@ -38,4 +39,8 @@ export function dimensionMismatchError(expected: number, actual: number): Embedd
 
 export function noUsableEmbeddingError(): EmbeddingError {
   return new EmbeddingError("NO_USABLE_EMBEDDING", "The embedding provider did not return any usable vector.");
+}
+
+export function rateLimitedError(): EmbeddingError {
+  return new EmbeddingError("RATE_LIMITED", "The embedding provider rejected the request due to rate limits or usage quotas.");
 }

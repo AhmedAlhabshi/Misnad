@@ -8,6 +8,14 @@ export interface ContractAnalysisProviderRequest {
    * model's response schema rather than relying on prompt text alone.
    */
   jsonSchema?: unknown;
+  /**
+   * Short operation label (e.g. "contractAnalysis", "personalizedAnalysis",
+   * "answerComposer") used only for safe diagnostics — never included in
+   * the request sent to a provider. Optional and provider-specific: the
+   * Gemini provider uses it to tag key-pool diagnostics; other providers may
+   * ignore it entirely.
+   */
+  context?: string;
 }
 
 /**

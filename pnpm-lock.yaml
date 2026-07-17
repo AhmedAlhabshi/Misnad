@@ -801,6 +801,9 @@ importers:
       '@workspace/contract-types':
         specifier: workspace:*
         version: link:../contract-types
+      '@workspace/gemini-key-pool':
+        specifier: workspace:*
+        version: link:../gemini-key-pool
       zod:
         specifier: 'catalog:'
         version: 3.25.76
@@ -911,6 +914,15 @@ importers:
         specifier: 'catalog:'
         version: 4.22.4
 
+  lib/gemini-key-pool:
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.4
+      tsx:
+        specifier: 'catalog:'
+        version: 4.22.4
+
   lib/legal-rag:
     dependencies:
       '@google/genai':
@@ -922,6 +934,9 @@ importers:
       '@workspace/db':
         specifier: workspace:*
         version: link:../db
+      '@workspace/gemini-key-pool':
+        specifier: workspace:*
+        version: link:../gemini-key-pool
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@types/pg@8.20.0)(pg@8.22.0)

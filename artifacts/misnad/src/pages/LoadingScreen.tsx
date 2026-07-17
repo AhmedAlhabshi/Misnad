@@ -3,10 +3,14 @@ import { motion } from "framer-motion";
 import { FileText, CheckCircle2, Loader2, Clock, XCircle } from "lucide-react";
 import {
   ANALYSIS_PROGRESS_STAGES,
+  FINAL_STAGE_EXTENDED_WAIT_STATUS,
+  MAIN_PROGRESS_STAGES,
   MAX_AUTO_COMPLETED_STAGES,
   OCR_PROGRESS_STAGES,
-  progressStageLabel,
-  type ProgressStageStatus,
+  computeMainStageStatuses,
+  isFinalStageExtendedWait,
+  mainStageLabel,
+  mainStageStatusMessage,
 } from "@/lib/analysisProgress";
 import type {
   AnalyzeContractApiResponse,
@@ -158,102 +162,42 @@ export default function LoadingScreen({
   }
 
   const copy = COPY[pendingUpload.analysisLanguage];
+  const mainStageStatuses = computeMainStageStatuses({ completedCount, ocrStageIndex, failed });
+  const isExtendedWait = isFinalStageExtendedWait(ocrStageIndex);
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="p-6 flex flex-col items-center justify-center min-h-screen gap-10"
+      className="p-4 sm:p-6 flex flex-col items-center justify-center min-h-screen gap-5 sm:gap-10"
     >
-      <div className="relative w-[140px] h-[140px] flex items-center justify-center">
-        <div className="w-16 h-16 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 flex items-center justify-center text-indigo-400">
-          {failed ? <XCircle size={32} className="text-red-500" /> : <FileText size={32} />}
+      <div className="relative w-[90px] h-[90px] sm:w-[140px] sm:h-[140px] flex items-center justify-center">
+        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 flex items-center justify-center text-indigo-400">
+          {failed ? <XCircle size={28} className="text-red-500" /> : <FileText size={28} />}
         </div>
       </div>
 
-      <h2 className="text-xl font-bold text-white tracking-wide" data-testid="text-loading-heading">
+      <h2 className="text-lg sm:text-xl font-bold text-white tracking-wide text-center" data-testid="text-loading-heading">
         {failed ? copy.failedHeading : copy.heading}
       </h2>
 
-      <div className="w-full flex flex-col gap-3">
-        {ANALYSIS_PROGRESS_STAGES.map((stage, idx) => {
-          // Once the OCR-specific stages have started showing, the base
-          // sequence's final stage reads as completed (the wait has moved
-          // on to OCR-specific work) rather than perpetually "active".
-          const isCompleted = idx < completedCount || (idx === completedCount && ocrStageIndex >= 0);
-          const isCurrent = idx === completedCount && ocrStageIndex < 0;
-          const isFailedStage = failed && isCurrent;
-          const status: ProgressStageStatus = isCompleted
-            ? "completed"
-            : isFailedStage
-              ? "failed"
-              : isCurrent
-                ? "active"
-                : "pending";
+      <div className="w-full flex flex-col gap-2 sm:gap-3">
+        {MAIN_PROGRESS_STAGES.map((stage, idx) => {
+          const status = mainStageStatuses[idx];
 
           return (
             <div
               key={idx}
-              data-testid={`progress-stage-${idx}`}
+              data-testid={`progress-main-stage-${idx}`}
               data-status={status}
-              className={`h-[52px] rounded-xl flex items-center px-4 gap-4 transition-all duration-300 ${
+              className={`rounded-xl flex flex-col justify-center px-4 py-2.5 sm:py-3 gap-0.5 transition-all duration-300 ${
                 status === "active" ? "bg-indigo-500/10 border border-indigo-500/20" : "bg-white/5 border border-white/5"
               } ${status === "completed" ? "bg-emerald-500/10 border-emerald-500/20" : ""} ${
                 status === "failed" ? "bg-red-500/10 border-red-500/20" : ""
               }`}
             >
-              <div className="shrink-0 w-6 flex justify-center">
-                {status === "completed" ? (
-                  <CheckCircle2 size={20} className="text-emerald-500" />
-                ) : status === "failed" ? (
-                  <XCircle size={20} className="text-red-500" />
-                ) : status === "active" ? (
-                  <Loader2 size={20} className="text-indigo-400 animate-spin" />
-                ) : (
-                  <Clock size={20} className="text-muted-foreground/50" />
-                )}
-              </div>
-              <span
-                className={`font-semibold text-[15px] ${
-                  status === "completed"
-                    ? "text-emerald-500"
-                    : status === "failed"
-                      ? "text-red-400"
-                      : status === "active"
-                        ? "text-indigo-400"
-                        : "text-muted-foreground"
-                }`}
-              >
-                {progressStageLabel(stage, pendingUpload.analysisLanguage)}
-              </span>
-            </div>
-          );
-        })}
-        {ocrStageIndex >= 0 &&
-          OCR_PROGRESS_STAGES.slice(0, ocrStageIndex + 1).map((stage, idx) => {
-            const isCompleted = idx < ocrStageIndex;
-            const isCurrent = idx === ocrStageIndex;
-            const isFailedStage = failed && isCurrent;
-            const status: ProgressStageStatus = isCompleted
-              ? "completed"
-              : isFailedStage
-                ? "failed"
-                : isCurrent
-                  ? "active"
-                  : "pending";
-
-            return (
-              <div
-                key={`ocr-${idx}`}
-                data-testid={`progress-stage-ocr-${idx}`}
-                data-status={status}
-                className={`h-[52px] rounded-xl flex items-center px-4 gap-4 transition-all duration-300 ${
-                  status === "active" ? "bg-indigo-500/10 border border-indigo-500/20" : "bg-white/5 border border-white/5"
-                } ${status === "completed" ? "bg-emerald-500/10 border-emerald-500/20" : ""} ${
-                  status === "failed" ? "bg-red-500/10 border-red-500/20" : ""
-                }`}
-              >
+              <div className="flex items-center gap-3 sm:gap-4">
                 <div className="shrink-0 w-6 flex justify-center">
                   {status === "completed" ? (
                     <CheckCircle2 size={20} className="text-emerald-500" />
@@ -266,7 +210,7 @@ export default function LoadingScreen({
                   )}
                 </div>
                 <span
-                  className={`font-semibold text-[15px] ${
+                  className={`font-semibold text-[14px] sm:text-[15px] ${
                     status === "completed"
                       ? "text-emerald-500"
                       : status === "failed"
@@ -276,11 +220,22 @@ export default function LoadingScreen({
                           : "text-muted-foreground"
                   }`}
                 >
-                  {progressStageLabel(stage, pendingUpload.analysisLanguage)}
+                  {mainStageLabel(stage, pendingUpload.analysisLanguage)}
                 </span>
               </div>
-            );
-          })}
+              {status === "active" && (
+                <p
+                  data-testid={`progress-main-stage-${idx}-status`}
+                  className="ps-9 sm:ps-10 text-[12px] text-indigo-300/80"
+                >
+                  {idx === MAIN_PROGRESS_STAGES.length - 1 && isExtendedWait
+                    ? FINAL_STAGE_EXTENDED_WAIT_STATUS[pendingUpload.analysisLanguage]
+                    : mainStageStatusMessage(stage, pendingUpload.analysisLanguage)}
+                </p>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {failed ? (

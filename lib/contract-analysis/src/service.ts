@@ -116,6 +116,7 @@ async function runAnalysisAttempts(
     systemInstructions: SYSTEM_INSTRUCTIONS,
     userPrompt: buildAnalysisPrompt(maskedText, contractType, analysisLanguage, recoveryNotes),
     jsonSchema,
+    context: "contractAnalysis",
   });
 
   const firstAttempt = tryValidate(firstResponse.rawText, maskedText);
@@ -143,6 +144,7 @@ async function runAnalysisAttempts(
       recoveryNotes,
     }),
     jsonSchema,
+    context: "contractAnalysis",
   });
 
   const secondAttempt = tryValidate(correctionResponse.rawText, maskedText);

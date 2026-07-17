@@ -110,6 +110,7 @@ export interface ResultsCopy {
       questionLabel: string;
       loading: string;
       unavailable: string;
+      retryAction: string;
     };
   };
 
@@ -147,6 +148,8 @@ export interface ResultsCopy {
     overLimitMessage: string;
     sessionUnavailableNotice: string;
     loadingStages: string[];
+    /** Shown in place of the last loading stage once the request has been pending long enough that the fixed stage sequence has fully run its course but the real answer still hasn't arrived — never implies a restart, never reveals provider/key/retry details. */
+    extendedWaitMessage: string;
     suggestedTitle: string;
     contractCitationLabel: string;
     legalCitationLabel: string;
@@ -236,6 +239,7 @@ const AR: ResultsCopy = {
       questionLabel: "سؤال",
       loading: "جارٍ إعداد التحليل الشخصي...",
       unavailable: "تعذّر إعداد التحليل الشخصي حالياً. تبقى الأرقام أعلاه متاحة وصحيحة.",
+      retryAction: "إعادة المحاولة",
     },
   },
 
@@ -260,7 +264,8 @@ const AR: ResultsCopy = {
     charactersRemainingTemplate: (remaining) => `${remaining} حرفاً متبقياً`,
     overLimitMessage: "السؤال طويل جداً. يرجى اختصاره.",
     sessionUnavailableNotice: "الأسئلة المتعلقة بتفاصيل عقدك تحديداً غير متاحة مؤقتاً لهذه الجلسة. الأسئلة العامة والمتعلقة بالأنظمة قد تظل تعمل.",
-    loadingStages: ["جارٍ مراجعة المعلومات المرتبطة بسؤالك", "يراجع الأنظمة ذات العلاقة", "يصيغ إجابة موثقة"],
+    loadingStages: ["البحث داخل العقد", "مراجعة المصادر النظامية", "تجهيز الإجابة", "صياغة الرد النهائي"],
+    extendedWaitMessage: "جاري إنهاء الإجابة...",
     suggestedTitle: "أسئلة مقترحة",
     contractCitationLabel: "من عقدك",
     legalCitationLabel: "مرجع نظامي رسمي",
@@ -350,6 +355,7 @@ const EN: ResultsCopy = {
       questionLabel: "Question",
       loading: "Preparing your personalized analysis...",
       unavailable: "Personalized analysis isn't available right now. The numbers above remain accurate and available.",
+      retryAction: "Retry",
     },
   },
 
@@ -375,7 +381,8 @@ const EN: ResultsCopy = {
     overLimitMessage: "Your question is too long. Please shorten it.",
     sessionUnavailableNotice:
       "Questions specific to your contract's details aren't available for this session right now. General and regulation-related questions may still work.",
-    loadingStages: ["Searching your contract...", "Checking relevant regulations...", "Preparing a grounded answer..."],
+    loadingStages: ["Searching the contract", "Reviewing legal sources", "Preparing the answer", "Finalizing the response"],
+    extendedWaitMessage: "Finalizing the answer...",
     suggestedTitle: "Suggested questions",
     contractCitationLabel: "From your contract",
     legalCitationLabel: "Official legal reference",

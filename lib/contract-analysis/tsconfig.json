@@ -11,6 +11,7 @@
   "include": ["src"],
   "references": [
     { "path": "../contract-types" },
-    { "path": "../contract-schema" }
+    { "path": "../contract-schema" },
+    { "path": "../gemini-key-pool" }
   ]
 }

@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ContractChat from "../ContractChat";
 import ResultsScreen from "@/pages/ResultsScreen";
 import { MAX_QUESTION_LENGTH } from "@/lib/chatApi";
+import { RESULTS_COPY } from "@/lib/resultsCopy";
+
+const STAGE_ADVANCE_INTERVAL_MS = 1800;
 
 const BASE_ANALYSIS = null;
 const BASE_FINANCIAL_METRICS = null;
@@ -148,6 +151,160 @@ describe("ContractChat", () => {
 
     resolveFetch(jsonResponse(successBody()));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+  });
+
+  it("a rapid double-fire of the send action (e.g. a synchronous double click) still sends exactly one network request", async () => {
+    let resolveFetch: (value: Response) => void = () => {};
+    fetchMock.mockReturnValueOnce(new Promise<Response>((resolve) => (resolveFetch = resolve)));
+    const user = userEvent.setup();
+    render(<ContractChat language="en" contractType="auto_finance" contractRagSessionId={VALID_SESSION_ID} analysis={BASE_ANALYSIS} financialMetrics={BASE_FINANCIAL_METRICS} />);
+
+    await user.type(screen.getByTestId("chat-input-textarea"), "How much will I pay?");
+    const sendButton = screen.getByTestId("chat-send-button");
+
+    // Two clicks dispatched in the same synchronous act() call, before React
+    // has a chance to re-render `isSending`/disable the button between them
+    // — the only thing standing between this and two fetches is the
+    // synchronous `requestInFlightRef` guard in `submitQuestion`.
+    act(() => {
+      fireEvent.click(sendButton);
+      fireEvent.click(sendButton);
+    });
+
+    await screen.findByTestId("chat-loading-state");
+    resolveFetch(jsonResponse(successBody()));
+    await waitFor(() => expect(screen.queryByTestId("chat-loading-state")).not.toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(screen.getAllByTestId("chat-message-user")).toHaveLength(1);
+  });
+
+  it("never shows more than one pending loading indicator at a time", async () => {
+    let resolveFetch: (value: Response) => void = () => {};
+    fetchMock.mockReturnValueOnce(new Promise<Response>((resolve) => (resolveFetch = resolve)));
+    const user = userEvent.setup();
+    render(<ContractChat language="en" contractType="auto_finance" contractRagSessionId={VALID_SESSION_ID} analysis={BASE_ANALYSIS} financialMetrics={BASE_FINANCIAL_METRICS} />);
+
+    await user.type(screen.getByTestId("chat-input-textarea"), "How much will I pay?");
+    await user.click(screen.getByTestId("chat-send-button"));
+    await screen.findByTestId("chat-loading-state");
+
+    expect(screen.getAllByTestId("chat-loading-state")).toHaveLength(1);
+    resolveFetch(jsonResponse(successBody()));
+    await waitFor(() => expect(screen.queryByTestId("chat-loading-state")).not.toBeInTheDocument());
+  });
+
+  it(
+    "chat progress never regresses through a long wait (simulating Gemini key rotation, retries, or an " +
+      "OpenRouter fallback happening invisibly on the backend) and settles on the extended-wait message",
+    async () => {
+      let resolveFetch: (value: Response) => void = () => {};
+      fetchMock.mockReturnValueOnce(new Promise<Response>((resolve) => (resolveFetch = resolve)));
+
+      // Fake timers must be installed *before* the component mounts, so
+      // `ChatLoadingState`'s own `setInterval` is registered under fake-timer
+      // control from the start (installing them mid-test, after a real
+      // interval already exists, would leave that interval on the real
+      // clock, immune to `vi.advanceTimersByTime`) — `fireEvent` (not
+      // `userEvent`, which relies on real timers internally) drives the
+      // interaction for the same reason.
+      vi.useFakeTimers();
+      render(<ContractChat language="en" contractType="auto_finance" contractRagSessionId={VALID_SESSION_ID} analysis={BASE_ANALYSIS} financialMetrics={BASE_FINANCIAL_METRICS} />);
+
+      fireEventChange(screen.getByTestId("chat-input-textarea") as HTMLTextAreaElement, "How much will I pay?");
+      act(() => {
+        fireEvent.click(screen.getByTestId("chat-send-button"));
+      });
+
+      expect(screen.getByTestId("chat-loading-state")).toBeInTheDocument();
+
+      const stages = RESULTS_COPY.en.chat.loadingStages;
+      const seenLabels: string[] = [screen.getByTestId("chat-loading-stage-label").textContent!];
+
+      // Tick well past the point where every stage has been shown, simulating
+      // the backend taking a long time internally (key rotation/retries/fallback).
+      for (let tick = 1; tick <= stages.length + 6; tick++) {
+        act(() => {
+          vi.advanceTimersByTime(STAGE_ADVANCE_INTERVAL_MS);
+        });
+        seenLabels.push(screen.getByTestId("chat-loading-stage-label").textContent!);
+      }
+
+      // The first stage's label must never reappear once left behind — no
+      // internal backend behavior (key rotation, retries, fallback, 429/503/
+      // timeout recovery) may ever make the sequence look like it restarted.
+      expect(seenLabels.lastIndexOf(stages[0]!)).toBe(0);
+      expect(screen.getByTestId("chat-loading-stage-label")).toHaveTextContent(RESULTS_COPY.en.chat.extendedWaitMessage);
+
+      // Still exactly one loading indicator, one fetch, one user message.
+      expect(screen.getAllByTestId("chat-loading-state")).toHaveLength(1);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(screen.getAllByTestId("chat-message-user")).toHaveLength(1);
+
+      // The eventual answer (from whichever provider/key actually succeeded)
+      // still arrives normally and is never blocked by the earlier ticks.
+      vi.useRealTimers();
+      resolveFetch(jsonResponse(successBody()));
+      expect(await screen.findByTestId("chat-message-assistant")).toBeInTheDocument();
+      expect(screen.queryByTestId("chat-loading-state")).not.toBeInTheDocument();
+    },
+  );
+
+  it("sending a new question after a completed answer starts progress fresh from stage 1", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(successBody()));
+    const user = userEvent.setup();
+    render(<ContractChat language="en" contractType="auto_finance" contractRagSessionId={VALID_SESSION_ID} analysis={BASE_ANALYSIS} financialMetrics={BASE_FINANCIAL_METRICS} />);
+
+    await user.type(screen.getByTestId("chat-input-textarea"), "First question?");
+    await user.click(screen.getByTestId("chat-send-button"));
+    await screen.findByTestId("chat-message-assistant");
+    expect(screen.queryByTestId("chat-loading-state")).not.toBeInTheDocument();
+
+    let resolveSecondFetch: (value: Response) => void = () => {};
+    fetchMock.mockReturnValueOnce(new Promise<Response>((resolve) => (resolveSecondFetch = resolve)));
+    await user.type(screen.getByTestId("chat-input-textarea"), "Second question?");
+    await user.click(screen.getByTestId("chat-send-button"));
+
+    await screen.findByTestId("chat-loading-state");
+    expect(screen.getByTestId("chat-loading-stage-label")).toHaveTextContent(RESULTS_COPY.en.chat.loadingStages[0]!);
+
+    resolveSecondFetch(jsonResponse(successBody()));
+    await waitFor(() => expect(screen.getAllByTestId("chat-message-assistant")).toHaveLength(2));
+  });
+
+  it("retrying after a real failure starts fresh (a new loading indicator from stage 1) without duplicating any message", async () => {
+    let resolveRetryFetch: (value: Response) => void = () => {};
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ success: false, error: { code: "PROVIDER_RATE_LIMITED", message: "Busy, please try again.", retryable: true } }, 429))
+      .mockReturnValueOnce(new Promise<Response>((resolve) => (resolveRetryFetch = resolve)));
+    const user = userEvent.setup();
+    render(<ContractChat language="en" contractType="auto_finance" contractRagSessionId={VALID_SESSION_ID} analysis={BASE_ANALYSIS} financialMetrics={BASE_FINANCIAL_METRICS} />);
+
+    await user.type(screen.getByTestId("chat-input-textarea"), "Hello?");
+    await user.click(screen.getByTestId("chat-send-button"));
+    const errorMessage = await screen.findByTestId("chat-message-error");
+    expect(screen.getAllByTestId("chat-message-error")).toHaveLength(1);
+
+    const retryButton = within(errorMessage).getByTestId("chat-message-retry");
+    await user.click(retryButton);
+
+    // The retry's fetch is held open (not yet resolved) so the fresh loading
+    // indicator can be observed reliably, rather than racing a mock that
+    // resolves on the very next microtask.
+    await screen.findByTestId("chat-loading-state");
+    expect(screen.getByTestId("chat-loading-stage-label")).toHaveTextContent(RESULTS_COPY.en.chat.loadingStages[0]!);
+    expect(screen.getAllByTestId("chat-loading-state")).toHaveLength(1);
+
+    resolveRetryFetch(jsonResponse(successBody()));
+    expect(await screen.findByTestId("chat-message-assistant")).toBeInTheDocument();
+    // The retry produces exactly one new assistant message and exactly one
+    // new user-message bubble resending the same question (the established,
+    // preserved retry behavior — see submitQuestion's retryQuestion path);
+    // the original error message is still the only error message, never
+    // duplicated, and no extra/unexplained messages of any kind appear.
+    expect(screen.getAllByTestId("chat-message-error")).toHaveLength(1);
+    expect(screen.getAllByTestId("chat-message-assistant")).toHaveLength(1);
+    expect(screen.getAllByTestId("chat-message-user")).toHaveLength(2);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("shows the loading state while awaiting a response", async () => {

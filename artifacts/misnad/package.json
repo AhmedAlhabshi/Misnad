@@ -8,7 +8,7 @@
     "build": "vite build --config vite.config.ts",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx src/lib/__tests__/financialFormatters.test.ts && tsx src/lib/__tests__/financialMetricsCopy.test.ts && tsx src/lib/__tests__/financialPresentation.test.ts && tsx src/lib/__tests__/budgetImpact.test.ts && tsx src/lib/__tests__/safeFileName.test.ts && tsx src/lib/__tests__/textSanitization.test.ts && tsx src/lib/__tests__/financialConcepts.test.ts && tsx src/lib/__tests__/emergencyCoverageWording.test.ts && tsx src/lib/__tests__/clauseDedup.test.ts && tsx src/lib/__tests__/autoFinanceAcceptance.e2e.test.ts && tsx src/lib/__tests__/contractFinancialFacts.e2e.test.ts && tsx src/lib/__tests__/chatApi.test.ts && tsx src/lib/__tests__/suggestedQuestions.test.ts && tsx src/lib/__tests__/reportSummary.test.ts",
+    "test": "tsx src/lib/__tests__/financialFormatters.test.ts && tsx src/lib/__tests__/financialMetricsCopy.test.ts && tsx src/lib/__tests__/financialPresentation.test.ts && tsx src/lib/__tests__/budgetImpact.test.ts && tsx src/lib/__tests__/safeFileName.test.ts && tsx src/lib/__tests__/textSanitization.test.ts && tsx src/lib/__tests__/financialConcepts.test.ts && tsx src/lib/__tests__/emergencyCoverageWording.test.ts && tsx src/lib/__tests__/clauseDedup.test.ts && tsx src/lib/__tests__/autoFinanceAcceptance.e2e.test.ts && tsx src/lib/__tests__/contractFinancialFacts.e2e.test.ts && tsx src/lib/__tests__/chatApi.test.ts && tsx src/lib/__tests__/suggestedQuestions.test.ts && tsx src/lib/__tests__/reportSummary.test.ts && tsx src/lib/__tests__/analysisProgress.test.ts",
     "test:components": "vitest run"
   },
   "devDependencies": {

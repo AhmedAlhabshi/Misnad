@@ -62,7 +62,7 @@ async function testSuccessOnFirstAttempt(): Promise<void> {
     JSON.stringify(VALID_UNDERSTANDING),
   ]);
 
-  const result = await analyzeContract("Sample masked lease text", "lease", {
+  const result = await analyzeContract("Sample masked lease text", "lease", "en", {
     provider,
   });
 
@@ -76,7 +76,7 @@ async function testSuccessAfterCorrection(): Promise<void> {
     JSON.stringify(VALID_UNDERSTANDING),
   ]);
 
-  const result = await analyzeContract("Sample masked lease text", "lease", {
+  const result = await analyzeContract("Sample masked lease text", "lease", "en", {
     provider,
   });
 
@@ -91,7 +91,7 @@ async function testBothAttemptsFail(): Promise<void> {
   ]);
 
   try {
-    await analyzeContract("Sample masked lease text", "lease", { provider });
+    await analyzeContract("Sample masked lease text", "lease", "en", { provider });
     fail("expected analyzeContract to throw when both attempts fail");
   } catch (error) {
     assert(
@@ -106,7 +106,7 @@ async function testEmptyMaskedText(): Promise<void> {
   const { provider, callCount } = makeMockProvider([JSON.stringify(VALID_UNDERSTANDING)]);
 
   try {
-    await analyzeContract("   ", "lease", { provider });
+    await analyzeContract("   ", "lease", "en", { provider });
     fail("expected analyzeContract to throw for empty maskedText");
   } catch (error) {
     assert(
@@ -124,6 +124,7 @@ async function testInvalidContractType(): Promise<void> {
     await analyzeContract(
       "Sample masked text",
       "not_a_real_type" as unknown as ContractType,
+      "en",
       { provider },
     );
     fail("expected analyzeContract to throw for invalid contractType");
@@ -146,7 +147,7 @@ async function testMissingApiKeyAtCallTime(): Promise<void> {
     );
 
     try {
-      await analyzeContract("Sample masked text", "lease", {
+      await analyzeContract("Sample masked text", "lease", "en", {
         provider: geminiContractAnalysisProvider,
       });
       fail("expected analyzeContract to throw when GEMINI_API_KEY is missing");

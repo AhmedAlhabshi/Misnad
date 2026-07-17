@@ -173,4 +173,78 @@ describe("Personalized Analysis session state (survives tab switches, resets on 
     expect(screen.getByTestId("personalized-analysis-unavailable")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it("shows a retry action on failure (including a timeout), and retrying can succeed", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ success: false, code: "TIMEOUT" }, 504));
+    fetchMock.mockResolvedValueOnce(jsonResponse(personalizedAnalysisSuccessBody()));
+    const user = userEvent.setup();
+    const result = baseResult();
+    render(<ResultsScreen onNavigate={() => {}} analysisResult={result} />);
+
+    await goToFinancialAnalysisTab(user);
+    await submitBudgetForm(user);
+    await waitFor(() => expect(screen.getByTestId("personalized-analysis-unavailable")).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // The main contract results (deterministic budget-impact numbers) were
+    // never reset or failed by the AI request timing out.
+    expect(screen.getByTestId("financial-analysis-budget-impact")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("button-retry-personalized-analysis"));
+
+    await waitFor(() => expect(screen.getByTestId("personalized-analysis-personalImpact")).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not issue a duplicate personalized-analysis request when the component rerenders while one is pending", async () => {
+    let resolvePending: (value: Response) => void = () => {};
+    fetchMock.mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolvePending = resolve;
+        }),
+    );
+
+    const user = userEvent.setup();
+    const result = baseResult();
+    const { rerender } = render(<ResultsScreen onNavigate={() => {}} analysisResult={result} />);
+
+    await goToFinancialAnalysisTab(user);
+    await submitBudgetForm(user);
+    await waitFor(() => expect(screen.getByTestId("personalized-analysis-loading")).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // Same `analysisResult` reference (same session) — a rerender of the
+    // whole screen (e.g. a parent state change unrelated to this tab) must
+    // never re-trigger the in-flight request.
+    rerender(<ResultsScreen onNavigate={() => {}} analysisResult={result} />);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    resolvePending(jsonResponse(personalizedAnalysisSuccessBody()));
+    await waitFor(() => expect(screen.getByTestId("personalized-analysis-personalImpact")).toBeInTheDocument());
+  });
+
+  it("keeps every other result tab fully usable while a personalized-analysis request is still pending", async () => {
+    fetchMock.mockImplementationOnce(() => new Promise<Response>(() => {}));
+    const user = userEvent.setup();
+    const result = baseResult();
+    render(<ResultsScreen onNavigate={() => {}} analysisResult={result} />);
+
+    await goToFinancialAnalysisTab(user);
+    await submitBudgetForm(user);
+    await waitFor(() => expect(screen.getByTestId("personalized-analysis-loading")).toBeInTheDocument());
+
+    // Only this one section is loading — the rest of the app must stay
+    // fully navigable, never blocked by a pending personalized-analysis
+    // request.
+    await user.click(screen.getByTestId("tab-trigger-overview"));
+    expect(screen.getByTestId("tab-trigger-overview")).toHaveAttribute("data-state", "active");
+    expect(screen.queryByTestId("personalized-analysis-loading")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("tab-trigger-chat"));
+    expect(screen.getByTestId("contract-chat")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("tab-trigger-financialAnalysis"));
+    expect(screen.getByTestId("personalized-analysis-loading")).toBeInTheDocument();
+  });
 });

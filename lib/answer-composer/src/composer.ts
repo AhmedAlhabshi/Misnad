@@ -86,6 +86,7 @@ async function runComposerAttempts(
     systemInstructions,
     userPrompt: buildAnswerPrompt(context),
     jsonSchema: LLM_RESPONSE_JSON_SCHEMA,
+    context: "answerComposer",
   });
 
   const firstAttempt = tryValidateLlmResponse(firstResponse.rawText);
@@ -102,6 +103,7 @@ async function runComposerAttempts(
       validationErrorSummary: firstAttempt.errorSummary,
     }),
     jsonSchema: LLM_RESPONSE_JSON_SCHEMA,
+    context: "answerComposer",
   });
 
   const secondAttempt = tryValidateLlmResponse(correctionResponse.rawText);
