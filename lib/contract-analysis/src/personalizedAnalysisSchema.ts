@@ -51,6 +51,17 @@ export const financialConceptPayloadSchema = z.object({
  * (`selectApplicableMonthlyOutflow`/`selectApplicableUpfrontLiquidity`) — the
  * AI must never recompute, restate as a different value, or contradict any
  * of these; it only interprets what they mean for the user.
+ *
+ * `incomeBefore`/`incomeAfter`/`incomeChange`/`incomeChangePercentage` are
+ * employment-only additions (optional, `null`/absent for every other
+ * contract type): an employment contract changes the user's INCOME, not a
+ * monthly commitment the user pays, so it needs its own distinct figures
+ * rather than overloading `applicableMonthlyOutflow`/`contractIncomeRatio`
+ * (which remain `null` for employment — there is no monthly commitment the
+ * user pays). `availableBeforeContract`/`availableAfterContract`/
+ * `remainingSavings`/`emergencyCoverageMonths` are reused for employment
+ * too, populated with the employment-specific formulas
+ * (`calculateEmploymentIncomeImpact` in the frontend's `budgetImpact.ts`).
  */
 export const budgetMetricsPayloadSchema = z.object({
   monthlyIncome: z.number(),
@@ -66,16 +77,36 @@ export const budgetMetricsPayloadSchema = z.object({
   totalCommitmentRatio: z.number().nullable(),
   remainingSavings: z.number().nullable(),
   emergencyCoverageMonths: z.number().nullable(),
+  incomeBefore: z.number().nullable().optional(),
+  incomeAfter: z.number().nullable().optional(),
+  incomeChange: z.number().nullable().optional(),
+  incomeChangePercentage: z.number().nullable().optional(),
 });
 
-export const personalizedAnalysisRequestSchema = z.object({
-  analysisLanguage: z.enum(ANALYSIS_LANGUAGE_VALUES as [AnalysisLanguage, ...AnalysisLanguage[]]),
-  contractType: z.enum(CONTRACT_TYPE_VALUES as [ContractType, ...ContractType[]]),
-  contractSummary: z.string().max(500),
-  clauses: z.array(sanitizedClausePayloadSchema).max(MAX_CLAUSES),
-  financialConcepts: z.array(financialConceptPayloadSchema).max(MAX_CONCEPTS),
-  budgetMetrics: budgetMetricsPayloadSchema,
-});
+export const EMPLOYMENT_INCOME_MODE_VALUES = ["replace_current_income", "add_to_current_income"] as const;
+export const employmentIncomeModeSchema = z.enum(EMPLOYMENT_INCOME_MODE_VALUES);
+export type EmploymentIncomeMode = z.infer<typeof employmentIncomeModeSchema>;
+
+export const personalizedAnalysisRequestSchema = z
+  .object({
+    analysisLanguage: z.enum(ANALYSIS_LANGUAGE_VALUES as [AnalysisLanguage, ...AnalysisLanguage[]]),
+    contractType: z.enum(CONTRACT_TYPE_VALUES as [ContractType, ...ContractType[]]),
+    contractSummary: z.string().max(500),
+    clauses: z.array(sanitizedClausePayloadSchema).max(MAX_CLAUSES),
+    financialConcepts: z.array(financialConceptPayloadSchema).max(MAX_CONCEPTS),
+    budgetMetrics: budgetMetricsPayloadSchema,
+    /**
+     * Required only for `contractType === "employment"` (see the `.refine`
+     * below) — whether this contract's salary replaces the user's current
+     * income or adds to it. Absent/`null` for every other contract type,
+     * which never asks this question.
+     */
+    employmentIncomeMode: employmentIncomeModeSchema.nullable().optional(),
+  })
+  .refine((data) => data.contractType !== "employment" || data.employmentIncomeMode != null, {
+    message: "employmentIncomeMode is required when contractType is 'employment'",
+    path: ["employmentIncomeMode"],
+  });
 
 export type SanitizedClausePayload = z.infer<typeof sanitizedClausePayloadSchema>;
 export type FinancialConceptPayload = z.infer<typeof financialConceptPayloadSchema>;

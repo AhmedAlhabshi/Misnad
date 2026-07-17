@@ -12,11 +12,14 @@ import {
   buildFinancialConcepts,
   classifyFinancialItemBucket,
   groupContractFinancialConcepts,
+  groupEmploymentFinancialConcepts,
   isStatedCapText,
   resolveCanonicalConcept,
   resolveContractFinancialGroup,
+  resolveEmploymentFinancialGroup,
   selectApplicableMonthlyOutflow,
   selectApplicableUpfrontLiquidity,
+  selectGuaranteedEmploymentIncome,
   type NormalizedFinancialItem,
 } from "../financialConcepts";
 
@@ -483,6 +486,108 @@ export function run(): void {
     assert.equal(upfront, null, "an employment contract with no guaranteed upfront/refundable amount must yield no applicable upfront liquidity");
   }
   console.log("PASS the same selectors correctly exclude income and conditional costs for a non-auto-finance (employment) fixture");
+
+  // --- selectGuaranteedEmploymentIncome: reads only the canonical monthly_income informational amount ---
+  {
+    const financialMetrics = buildFinancialMetrics({
+      informationalAmounts: [
+        informationalAmount({ id: "base-salary", type: "salary_component", label: "Base salary", amount: knownMoney(9000) }),
+        informationalAmount({ id: "housing", type: "salary_component", label: "Housing allowance", amount: knownMoney(2250) }),
+        informationalAmount({ id: "transport", type: "salary_component", label: "Transportation allowance", amount: knownMoney(750) }),
+        informationalAmount({ id: "guaranteed-income", type: "monthly_income", label: "Guaranteed monthly employment income", amount: knownMoney(12000) }),
+      ],
+    });
+    const concepts = buildFinancialConcepts(financialMetrics, "employment");
+    const guaranteed = selectGuaranteedEmploymentIncome(concepts);
+    assert.equal(guaranteed?.value, 12000, "the canonical guaranteed income must be the one true figure — never re-derived by summing the components again here");
+  }
+  console.log("PASS selectGuaranteedEmploymentIncome reads the single canonical monthly_income figure");
+
+  {
+    const concepts = buildFinancialConcepts(buildFinancialMetrics({}), "employment");
+    assert.equal(selectGuaranteedEmploymentIncome(concepts), null, "no monthly_income informational amount present must yield null, never a fabricated figure");
+  }
+  console.log("PASS selectGuaranteedEmploymentIncome returns null when no canonical income figure is present");
+
+  // --- resolveEmploymentFinancialGroup / groupEmploymentFinancialConcepts: the two 24,000 SAR
+  // amounts from the spec fixture must land in DIFFERENT groups and stay fully distinct --------
+  {
+    const financialMetrics = buildFinancialMetrics({
+      informationalAmounts: [
+        informationalAmount({ id: "guaranteed-income", type: "monthly_income", label: "Guaranteed monthly employment income", amount: knownMoney(12000) }),
+        informationalAmount({ id: "base-salary", type: "salary_component", label: "Base salary", amount: knownMoney(9000) }),
+        informationalAmount({ id: "housing", type: "salary_component", label: "Housing allowance", amount: knownMoney(2250) }),
+      ],
+      fees: [
+        feeItem({
+          id: "bonus",
+          label: "Performance bonus",
+          amount: knownMoney(1200),
+          frequency: "one_time",
+          mandatory: false,
+          conditional: true,
+          financialRole: "conditional_income",
+        }),
+        feeItem({
+          id: "medical",
+          label: "Medical insurance premium",
+          amount: knownMoney(150),
+          frequency: "monthly",
+          mandatory: false,
+          financialRole: "benefit",
+        }),
+      ],
+      penalties: [
+        penaltyItem({
+          id: "notice-deduction",
+          label: "Notice period deduction",
+          amount: knownMoney(24000),
+          trigger: "employee fails to complete the 60-day notice period",
+          financialRole: "conditional_cost",
+        }),
+        penaltyItem({
+          id: "termination-entitlement",
+          label: "Termination compensation",
+          amount: knownMoney(24000),
+          trigger: "employer terminates without a legitimate reason",
+          financialRole: "conditional_income",
+        }),
+      ],
+    });
+    const concepts = buildFinancialConcepts(financialMetrics, "employment");
+    const groups = groupEmploymentFinancialConcepts(concepts);
+
+    const receiveIds = (groups.whatYouWillReceive ?? []).map((i) => i.id);
+    assert.ok(receiveIds.includes("guaranteed-income"), "the canonical guaranteed income must appear under 'what you will receive'");
+
+    const breakdownIds = (groups.compensationBreakdown ?? []).map((i) => i.id);
+    assert.ok(breakdownIds.includes("base-salary") && breakdownIds.includes("housing"), "individual salary components must appear under 'compensation breakdown'");
+
+    const conditionalIds = (groups.conditionalOrNonGuaranteed ?? []).map((i) => i.id);
+    assert.ok(conditionalIds.includes("bonus"), "the performance bonus must appear under 'conditional or non-guaranteed amounts'");
+    assert.ok(
+      conditionalIds.includes("termination-entitlement"),
+      "the termination compensation must appear as a potential employee entitlement under 'conditional or non-guaranteed amounts', never under deductions",
+    );
+
+    const deductionIds = (groups.potentialDeductions ?? []).map((i) => i.id);
+    assert.ok(deductionIds.includes("notice-deduction"), "the notice-period deduction must appear under 'potential deductions or obligations'");
+    assert.ok(!deductionIds.includes("termination-entitlement"), "the termination compensation must never be grouped alongside the employee's own deduction");
+
+    const benefitIds = (groups.otherBenefits ?? []).map((i) => i.id);
+    assert.ok(benefitIds.includes("medical"), "medical insurance must appear under 'other benefits'");
+
+    // The two 24,000 SAR amounts must both survive, fully distinct — never deduplicated merely because the amounts match.
+    const bothTwentyFourK = concepts.filter((c) => c.amount.value === 24000);
+    assert.equal(bothTwentyFourK.length, 2, "both 24,000 SAR amounts must be present — they represent opposite-direction facts, not duplicates");
+    const twentyFourKGroups = new Set(bothTwentyFourK.map((c) => resolveEmploymentFinancialGroup(c)));
+    assert.deepEqual(
+      [...twentyFourKGroups].sort(),
+      ["conditionalOrNonGuaranteed", "potentialDeductions"].sort(),
+      "the two 24,000 SAR amounts must resolve to two DIFFERENT groups, reflecting their opposite direction",
+    );
+  }
+  console.log("PASS resolveEmploymentFinancialGroup/groupEmploymentFinancialConcepts keep the two 24,000 SAR amounts distinct and correctly grouped");
 
   console.log("PASS financialConcepts.test.ts");
 }

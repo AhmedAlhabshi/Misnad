@@ -152,6 +152,10 @@ const SPECIAL_KEY_TO_INFORMATIONAL_TYPE: Record<SpecialValueKey, InformationalAm
   insuranceDeductible: "insurance_deductible",
   coverageAmount: "coverage_amount",
   rate: "rate",
+  recurringEquivalent: "annual_equivalent",
+  statedDueAtSigning: "stated_due_at_signing",
+  salaryComponent: "salary_component",
+  statedTotalCompensation: "total_fixed_compensation",
 };
 
 /**

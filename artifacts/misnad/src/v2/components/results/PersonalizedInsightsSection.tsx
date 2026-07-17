@@ -137,7 +137,7 @@ export default function PersonalizedInsightsSection({
   const concepts = financialMetrics ? buildFinancialConcepts(financialMetrics, analysis.contractType) : [];
   const currency = financialMetrics?.currency ?? null;
   const applicableMonthlyOutflow = selectApplicableMonthlyOutflow(concepts);
-  const applicableUpfrontLiquidity = selectApplicableUpfrontLiquidity(concepts);
+  const applicableUpfrontLiquidity = selectApplicableUpfrontLiquidity(concepts, analysis.contractType);
   const monthlyCommitment = applicableMonthlyOutflow?.value ?? null;
   const upfrontCosts = applicableUpfrontLiquidity?.value ?? null;
 
@@ -185,7 +185,7 @@ export default function PersonalizedInsightsSection({
             contractIncomeRatio: result!.contractIncomeRatio,
             totalCommitmentRatio: result!.totalCommitmentRatio,
             remainingSavings: result!.remainingSavings,
-            emergencyCoverageMonths: result!.emergencyCoverageMonths,
+            emergencyCoverageMonths: result!.emergencyFundCoverageMonths,
           },
         };
 

@@ -229,6 +229,96 @@ export function isStatedTotalCostText(...texts: Array<string | null | undefined>
   return containsAnyKeyword(combined, TOTAL_COST_KEYWORDS);
 }
 
+const DUE_AT_SIGNING_TOTAL_KEYWORDS = [
+  "due at signing", "total due at signing", "amount due at signing", "payable at signing",
+  "total payable at signing", "cash due at signing", "due at lease signing", "total amount due at signing",
+  "due at contract signing", "total due at contract signing",
+  "المبلغ المستحق عند التوقيع", "الإجمالي المستحق عند التوقيع", "إجمالي المستحق عند التوقيع",
+  "المبلغ الإجمالي المستحق عند التوقيع", "المستحق عند توقيع العقد", "إجمالي المبلغ المستحق عند التوقيع",
+];
+
+/**
+ * True when the text names an amount as the total *due at signing/contract
+ * start* — narrower than `isStatedTotalCostText` above (a stated grand total
+ * for the whole contract), and used only to prefer a contract's own stated
+ * upfront-cash figure over a per-item reconstruction when the two agree (see
+ * `financialConcepts.ts`'s `selectApplicableUpfrontLiquidity` in the misnad
+ * frontend).
+ */
+export function isStatedDueAtSigningText(...texts: Array<string | null | undefined>): boolean {
+  const combined = texts.filter((text): text is string => typeof text === "string").join(" ");
+  return containsAnyKeyword(combined, DUE_AT_SIGNING_TOTAL_KEYWORDS);
+}
+
+const COMPENSATION_COMPONENT_KEYWORDS = [
+  "housing allowance", "accommodation allowance", "transportation allowance", "transport allowance",
+  "cost of living allowance", "fixed allowance", "guaranteed allowance", "monthly allowance",
+  "بدل سكن", "بدل السكن", "بدل نقل", "بدل النقل", "بدل مواصلات", "بدل ثابت", "بدل شهري",
+];
+
+/** True when a candidate's own label/description reads as a guaranteed, fixed salary component (a housing/transportation/other fixed allowance) — never a conditional or variable amount. */
+export function isCompensationComponentText(...texts: Array<string | null | undefined>): boolean {
+  const combined = texts.filter((text): text is string => typeof text === "string").join(" ");
+  return containsAnyKeyword(combined, COMPENSATION_COMPONENT_KEYWORDS);
+}
+
+const STATED_TOTAL_COMPENSATION_KEYWORDS = [
+  "total fixed monthly compensation", "total fixed compensation", "total monthly compensation",
+  "total guaranteed compensation", "gross fixed monthly salary", "total fixed salary",
+  "إجمالي الراتب الثابت الشهري", "إجمالي التعويض الثابت", "إجمالي الأجر الثابت الشهري", "إجمالي الراتب الشهري الثابت",
+];
+
+/** True when the text states one explicit total that already sums the guaranteed salary components (base + fixed allowances) — narrower than a generic stated grand total. */
+export function isStatedTotalCompensationText(...texts: Array<string | null | undefined>): boolean {
+  const combined = texts.filter((text): text is string => typeof text === "string").join(" ");
+  return containsAnyKeyword(combined, STATED_TOTAL_COMPENSATION_KEYWORDS);
+}
+
+const CONDITIONAL_COMPENSATION_KEYWORDS = [
+  "performance bonus", "discretionary bonus", "annual bonus", "incentive bonus", "commission",
+  "overtime pay", "overtime compensation", "variable pay", "profit share", "profit-sharing",
+  "مكافأة الأداء", "مكافأة تقديرية", "مكافأة سنوية", "عمولة", "أجر إضافي", "بدل ساعات إضافية", "مكافأة تحفيزية",
+];
+
+/** True when the text describes non-guaranteed, performance-dependent compensation (a bonus, commission, or uncertain overtime pay) — never counted as guaranteed income. */
+export function isConditionalCompensationText(...texts: Array<string | null | undefined>): boolean {
+  const combined = texts.filter((text): text is string => typeof text === "string").join(" ");
+  return containsAnyKeyword(combined, CONDITIONAL_COMPENSATION_KEYWORDS);
+}
+
+const NON_CASH_BENEFIT_KEYWORDS = [
+  "medical insurance", "health insurance", "annual leave", "paid leave", "overtime entitlement",
+  "non-cash benefit", "in-kind benefit", "end of service", "end-of-service", "gratuity",
+  "تأمين طبي", "تأمين صحي", "إجازة سنوية", "إجازة مدفوعة", "استحقاق العمل الإضافي", "مزايا عينية", "مكافأة نهاية الخدمة",
+];
+
+/** True when the text describes a non-cash or qualitative employment benefit (medical insurance, paid leave, overtime entitlement, ...) — never a monthly cost or guaranteed cash amount. */
+export function isNonCashBenefitText(...texts: Array<string | null | undefined>): boolean {
+  const combined = texts.filter((text): text is string => typeof text === "string").join(" ");
+  return containsAnyKeyword(combined, NON_CASH_BENEFIT_KEYWORDS);
+}
+
+const EMPLOYEE_ENTITLEMENT_KEYWORDS = [
+  "entitled to compensation", "employee shall be entitled", "payable to the employee", "compensation to the employee",
+  "compensation payable to the employee", "without a legitimate reason", "without legitimate reason",
+  "without just cause", "without a just cause", "unjustified termination", "unjustified dismissal", "arbitrary dismissal",
+  "يستحق الموظف", "تعويض للموظف", "يحق للموظف", "دون سبب مشروع", "دون مبرر مشروع", "بدون سبب مشروع", "فصل تعسفي", "إنهاء تعسفي",
+];
+
+/**
+ * True when a conditional amount flows TO the employee (an employer-paid
+ * termination/compensation entitlement) rather than the far more common
+ * direction (the customer/employee owes the counterparty) every other
+ * contract type's penalties assume. Checked only within the
+ * employment-specific classification pass — never applied generically —
+ * so a lease/auto-finance early-termination FEE (paid BY the customer) is
+ * never affected.
+ */
+export function isEmployeeEntitlementText(...texts: Array<string | null | undefined>): boolean {
+  const combined = texts.filter((text): text is string => typeof text === "string").join(" ");
+  return containsAnyKeyword(combined, EMPLOYEE_ENTITLEMENT_KEYWORDS);
+}
+
 const DEPOSIT_KEYWORDS = ["deposit", "security deposit", "تأمين", "وديعة", "عربون"];
 
 /** True when the text identifies the item as a deposit — the one item shape whose refundability is a genuinely open question (unlike an ordinary fee, which is conventionally non-refundable). */

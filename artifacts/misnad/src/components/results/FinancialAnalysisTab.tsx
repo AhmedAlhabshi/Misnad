@@ -4,8 +4,20 @@ import type { FinancialMetrics } from "@workspace/financial-metrics";
 import type { ContractAnalysisResult } from "@/types/analysis";
 import { RESULTS_COPY } from "@/lib/resultsCopy";
 import { formatMoneyMetric, type MoneyMetricLike } from "@/lib/financialFormatters";
-import { calculateBudgetImpact, hasMinimumBudgetInputs, parseBudgetInputValue } from "@/lib/budgetImpact";
-import { buildFinancialConcepts, selectApplicableMonthlyOutflow, selectApplicableUpfrontLiquidity } from "@/lib/financialConcepts";
+import {
+  calculateBudgetImpact,
+  calculateEmploymentBudgetImpact,
+  hasMinimumBudgetInputs,
+  parseBudgetInputValue,
+  type EmploymentBudgetImpactResult,
+  type EmploymentIncomeMode,
+} from "@/lib/budgetImpact";
+import {
+  buildFinancialConcepts,
+  selectApplicableMonthlyOutflow,
+  selectApplicableUpfrontLiquidity,
+  selectGuaranteedEmploymentIncome,
+} from "@/lib/financialConcepts";
 import { fetchPersonalizedAnalysis } from "@/lib/personalizedAnalysisApi";
 import type { PersonalizedAnalysisSession } from "@/hooks/usePersonalizedAnalysisSession";
 import Accordion from "./shared/Accordion";
@@ -41,8 +53,12 @@ export default function FinancialAnalysisTab({
   session: PersonalizedAnalysisSession;
 }) {
   const copy = RESULTS_COPY[language];
+  const isEmployment = analysis.contractType === "employment";
   const form = session.state.form;
   const result = session.state.budgetResult;
+  const employmentMode = session.state.employmentIncomeMode;
+  const employmentResult = session.state.employmentBudgetResult;
+  const activeResult = isEmployment ? employmentResult : result;
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["budgetImpact"]));
   // Synchronous guard against a duplicate in-flight personalized-analysis
   // request — e.g. a fast double-click on "Retry", or any rerender/tab
@@ -65,20 +81,22 @@ export default function FinancialAnalysisTab({
   const concepts = financialMetrics ? buildFinancialConcepts(financialMetrics, analysis.contractType) : [];
   const currency = financialMetrics?.currency ?? null;
   const applicableMonthlyOutflow = selectApplicableMonthlyOutflow(concepts);
-  const applicableUpfrontLiquidity = selectApplicableUpfrontLiquidity(concepts);
+  const applicableUpfrontLiquidity = selectApplicableUpfrontLiquidity(concepts, analysis.contractType);
   const monthlyCommitment = applicableMonthlyOutflow?.value ?? null;
   const upfrontCosts = applicableUpfrontLiquidity?.value ?? null;
+  const guaranteedEmploymentIncome = isEmployment ? selectGuaranteedEmploymentIncome(concepts) : null;
 
   const monthlyIncome = parseBudgetInputValue(form.monthlyIncome);
   const essentialExpenses = parseBudgetInputValue(form.essentialExpenses);
   const existingDebt = parseBudgetInputValue(form.existingDebt);
   const savings = parseBudgetInputValue(form.savings);
 
-  const canSubmit = hasMinimumBudgetInputs({
-    monthlyIncome: monthlyIncome ?? undefined,
-    essentialExpenses: essentialExpenses ?? undefined,
-    existingMonthlyDebt: existingDebt ?? undefined,
-  });
+  const canSubmit =
+    hasMinimumBudgetInputs({
+      monthlyIncome: monthlyIncome ?? undefined,
+      essentialExpenses: essentialExpenses ?? undefined,
+      existingMonthlyDebt: existingDebt ?? undefined,
+    }) && (!isEmployment || employmentMode !== null);
 
   /**
    * Fires the actual personalized-analysis request against an already-set
@@ -112,7 +130,55 @@ export default function FinancialAnalysisTab({
       contractIncomeRatio: budgetResult.contractIncomeRatio,
       totalCommitmentRatio: budgetResult.totalCommitmentRatio,
       remainingSavings: budgetResult.remainingSavings,
-      emergencyCoverageMonths: budgetResult.emergencyCoverageMonths,
+      // The AI-facing figure is the rounded canonical value (one decimal
+      // place) — never the raw, unrounded division result — so the
+      // personalized narrative can only ever restate a clean number.
+      emergencyCoverageMonths: budgetResult.emergencyFundCoverageMonths,
+    }).then((outcome) => {
+      requestInFlightRef.current = false;
+      if (outcome.success) {
+        session.setPersonalizedAnalysisResult(outcome.data);
+      } else {
+        session.setPersonalizedAnalysisUnavailable();
+      }
+    });
+  }
+
+  /**
+   * Employment's counterpart to `runPersonalizedAnalysis` — sends the
+   * canonical income figures and the selected mode instead of the generic
+   * ratio-oriented fields, which never apply to an employment contract (see
+   * `personalizedAnalysisPrompt.ts`'s `formatEmploymentBudgetMetricsSection`).
+   */
+  function runEmploymentPersonalizedAnalysis(budgetResult: EmploymentBudgetImpactResult, mode: EmploymentIncomeMode) {
+    if (requestInFlightRef.current) {
+      return;
+    }
+    if (monthlyIncome === null || essentialExpenses === null || existingDebt === null) {
+      return;
+    }
+    requestInFlightRef.current = true;
+
+    session.startPersonalizedAnalysis();
+    fetchPersonalizedAnalysis({
+      language,
+      analysis,
+      concepts,
+      currency,
+      applicableMonthlyOutflow: monthlyCommitment,
+      applicableUpfrontLiquidity: upfrontCosts,
+      budgetInputs: { monthlyIncome, essentialExpenses, existingMonthlyDebt: existingDebt, savings },
+      availableBeforeContract: budgetResult.remainingBefore,
+      availableAfterContract: budgetResult.remainingAfter,
+      contractIncomeRatio: null,
+      totalCommitmentRatio: null,
+      remainingSavings: budgetResult.savingsAfterContract,
+      emergencyCoverageMonths: budgetResult.emergencyFundCoverageMonths,
+      employmentIncomeMode: mode,
+      incomeBefore: budgetResult.incomeBefore,
+      incomeAfter: budgetResult.incomeAfter,
+      incomeChange: budgetResult.incomeChange,
+      incomeChangePercentage: budgetResult.incomeChangePercentage,
     }).then((outcome) => {
       requestInFlightRef.current = false;
       if (outcome.success) {
@@ -127,6 +193,29 @@ export default function FinancialAnalysisTab({
     e.preventDefault();
     if (!canSubmit || monthlyIncome === null || essentialExpenses === null || existingDebt === null) return;
 
+    if (isEmployment) {
+      if (employmentMode === null) return;
+      const newEmploymentResult = calculateEmploymentBudgetImpact(
+        { currentMonthlyIncome: monthlyIncome, monthlyLivingExpenses: essentialExpenses, monthlyDebtPayments: existingDebt, savings },
+        {
+          guaranteedMonthlyIncome: guaranteedEmploymentIncome?.value ?? null,
+          // No classification currently produces a *confirmed* recurring
+          // employee deduction (statutory/social-insurance deductions are
+          // non-guaranteed per this contract type's own rules — see
+          // `resolveEmploymentFinancialGroup`'s "potential deductions"
+          // group) and no upfront employee-paid amount exists in the
+          // current employment fixture — both stay at their safe defaults
+          // until a future contract actually states one.
+          confirmedRecurringEmployeeDeductions: 0,
+          upfrontEmployeePayment: null,
+        },
+        employmentMode,
+      );
+      session.setEmploymentBudgetResult(newEmploymentResult);
+      runEmploymentPersonalizedAnalysis(newEmploymentResult, employmentMode);
+      return;
+    }
+
     const budgetResult = calculateBudgetImpact(
       { monthlyIncome, essentialExpenses, existingMonthlyDebt: existingDebt, savings },
       { monthlyCommitment, upfrontCosts },
@@ -140,6 +229,11 @@ export default function FinancialAnalysisTab({
   }
 
   function handleRetryPersonalizedAnalysis() {
+    if (isEmployment) {
+      if (!employmentResult || employmentMode === null) return;
+      runEmploymentPersonalizedAnalysis(employmentResult, employmentMode);
+      return;
+    }
     if (!result) {
       return;
     }
@@ -150,7 +244,9 @@ export default function FinancialAnalysisTab({
     session.resetBudgetResult();
   }
 
-  if (!result) {
+  if (!activeResult) {
+    const modeCopy = copy.financialAnalysis.employmentIncomeMode;
+
     return (
       <div dir={language === "ar" ? "rtl" : "ltr"} className="flex flex-col gap-6">
         <div>
@@ -219,6 +315,38 @@ export default function FinancialAnalysisTab({
             </p>
           )}
 
+          {isEmployment && (
+            <div className="flex flex-col gap-2.5" data-testid="employment-income-mode-question">
+              <span className="text-xs text-muted-foreground">{modeCopy.title}</span>
+
+              <button
+                type="button"
+                aria-pressed={employmentMode === "replace_current_income"}
+                data-testid="option-employment-mode-replace"
+                onClick={() => session.setEmploymentIncomeMode("replace_current_income")}
+                className={`flex flex-col gap-1 text-start p-4 rounded-xl border transition-colors ${
+                  employmentMode === "replace_current_income" ? "border-indigo-400 bg-indigo-400/10" : "border-white/10 bg-white/5"
+                }`}
+              >
+                <span className="text-[14px] font-bold text-white">{modeCopy.replaceOptionTitle}</span>
+                <span className="text-[12px] text-muted-foreground leading-relaxed">{modeCopy.replaceOptionDescription}</span>
+              </button>
+
+              <button
+                type="button"
+                aria-pressed={employmentMode === "add_to_current_income"}
+                data-testid="option-employment-mode-add"
+                onClick={() => session.setEmploymentIncomeMode("add_to_current_income")}
+                className={`flex flex-col gap-1 text-start p-4 rounded-xl border transition-colors ${
+                  employmentMode === "add_to_current_income" ? "border-indigo-400 bg-indigo-400/10" : "border-white/10 bg-white/5"
+                }`}
+              >
+                <span className="text-[14px] font-bold text-white">{modeCopy.addOptionTitle}</span>
+                <span className="text-[12px] text-muted-foreground leading-relaxed">{modeCopy.addOptionDescription}</span>
+              </button>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={!canSubmit}
@@ -232,12 +360,91 @@ export default function FinancialAnalysisTab({
     );
   }
 
-  const beforeText = moneyText(result.availableBeforeContract, currency, language);
-  const afterText = result.availableAfterContract !== null ? moneyText(result.availableAfterContract, currency, language) : null;
-  const contractIncomeRatioText = percentText(result.contractIncomeRatio, language);
-  const totalCommitmentRatioText = percentText(result.totalCommitmentRatio, language);
+  if (isEmployment && employmentResult) {
+    const empCopy = copy.financialAnalysis.employmentBudgetImpact;
+    const incomeBeforeText = moneyText(employmentResult.incomeBefore, currency, language);
+    const incomeAfterText = moneyText(employmentResult.incomeAfter, currency, language);
+    const incomeChangeText = moneyText(employmentResult.incomeChange, currency, language);
+    const remainingBeforeText = moneyText(employmentResult.remainingBefore, currency, language);
+    const remainingAfterText = moneyText(employmentResult.remainingAfter, currency, language);
+    const savingsAfterText = moneyText(employmentResult.savingsAfterContract, currency, language);
+    const incomeChangePercentageText = percentText(employmentResult.incomeChangePercentage, language) ?? empCopy.percentageUnavailable;
+
+    return (
+      <div dir={language === "ar" ? "rtl" : "ltr"} className="flex flex-col gap-3">
+        <div className="flex items-center justify-end -mb-1">
+          <button onClick={handleEdit} data-testid="button-edit-budget-inputs" className="text-xs font-semibold text-indigo-400">
+            {copy.financialAnalysis.editInputs}
+          </button>
+        </div>
+
+        <Accordion
+          title={empCopy.title}
+          expanded={expandedSections.has("budgetImpact")}
+          onToggle={() => toggleSection("budgetImpact")}
+          testId="financial-analysis-employment-budget-impact"
+        >
+          <div className="flex flex-col gap-2.5" data-testid="employment-budget-impact-rows">
+            {incomeBeforeText && (
+              <div className="flex items-center justify-between gap-3" data-testid="row-income-before">
+                <span className="text-[12px] text-muted-foreground">{empCopy.incomeBeforeLabel}</span>
+                <span className="text-[14px] font-bold text-white">{incomeBeforeText}</span>
+              </div>
+            )}
+            {incomeAfterText && (
+              <div className="flex items-center justify-between gap-3" data-testid="row-income-after">
+                <span className="text-[12px] text-muted-foreground">{empCopy.incomeAfterLabel}</span>
+                <span className="text-[14px] font-bold text-white">{incomeAfterText}</span>
+              </div>
+            )}
+            {incomeChangeText && (
+              <div className="flex items-center justify-between gap-3" data-testid="row-income-change">
+                <span className="text-[12px] text-muted-foreground">{empCopy.incomeChangeLabel}</span>
+                <span className="text-[14px] font-bold text-white">{incomeChangeText}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between gap-3" data-testid="row-income-change-percentage">
+              <span className="text-[12px] text-muted-foreground">{empCopy.incomeChangePercentageLabel}</span>
+              <span className="text-[14px] font-bold text-white">{incomeChangePercentageText}</span>
+            </div>
+            {remainingBeforeText && (
+              <div className="flex items-center justify-between gap-3" data-testid="row-remaining-before">
+                <span className="text-[12px] text-muted-foreground">{empCopy.remainingBeforeLabel}</span>
+                <span className="text-[14px] font-bold text-white">{remainingBeforeText}</span>
+              </div>
+            )}
+            {remainingAfterText && (
+              <div className="flex items-center justify-between gap-3" data-testid="row-remaining-after">
+                <span className="text-[12px] text-muted-foreground">{empCopy.remainingAfterLabel}</span>
+                <span className="text-[14px] font-bold text-white">{remainingAfterText}</span>
+              </div>
+            )}
+            {savingsAfterText && (
+              <div className="flex items-center justify-between gap-3" data-testid="row-savings-after">
+                <span className="text-[12px] text-muted-foreground">{empCopy.savingsAfterLabel}</span>
+                <span className="text-[14px] font-bold text-white">{savingsAfterText}</span>
+              </div>
+            )}
+          </div>
+        </Accordion>
+
+        <PersonalizedAnalysisSection
+          language={language}
+          status={session.state.status}
+          data={session.state.result}
+          onRetry={handleRetryPersonalizedAnalysis}
+        />
+      </div>
+    );
+  }
+
+  const genericResult = result!;
+  const beforeText = moneyText(genericResult.availableBeforeContract, currency, language);
+  const afterText = genericResult.availableAfterContract !== null ? moneyText(genericResult.availableAfterContract, currency, language) : null;
+  const contractIncomeRatioText = percentText(genericResult.contractIncomeRatio, language);
+  const totalCommitmentRatioText = percentText(genericResult.totalCommitmentRatio, language);
   const savingsBeforeText = savings !== null ? moneyText(savings, currency, language) : null;
-  const savingsAfterText = result.remainingSavings !== null ? moneyText(result.remainingSavings, currency, language) : null;
+  const savingsAfterText = genericResult.remainingSavings !== null ? moneyText(genericResult.remainingSavings, currency, language) : null;
 
   const budgetImpactCopy = copy.financialAnalysis.budgetImpact;
 

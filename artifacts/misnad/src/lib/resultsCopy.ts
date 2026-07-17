@@ -72,6 +72,24 @@ export interface ResultsCopy {
     };
   };
 
+  /**
+   * Employment-only replacements for `finances.*Title` — an employment
+   * contract's money is income, never a cost, so it gets its own 5-group
+   * model (see `financialConcepts.ts`'s `resolveEmploymentFinancialGroup`)
+   * instead of the generic groups above. Rendered only when
+   * `contractType === "employment"` (`ContractFinancesTab.tsx`) — every
+   * other contract type keeps using `finances` above, completely unchanged.
+   */
+  employmentFinances: {
+    whatYouWillReceiveTitle: string;
+    compensationBreakdownTitle: string;
+    conditionalOrNonGuaranteedTitle: string;
+    conditionalOrNonGuaranteedNotice: string;
+    potentialDeductionsTitle: string;
+    potentialDeductionsNotice: string;
+    otherBenefitsTitle: string;
+  };
+
   financialAnalysis: {
     introTitle: string;
     introBody: string;
@@ -100,6 +118,37 @@ export interface ResultsCopy {
       contractIncomeRatioLabel: string;
       totalCommitmentRatioLabel: string;
       savingsLabel: string;
+    };
+    /**
+     * The required employment-only question asked after the 4 shared
+     * inputs, before any employment analysis can run (see
+     * `hasMinimumEmploymentInputs` in `FinancialAnalysisTab.tsx`). Never
+     * shown for any other contract type.
+     */
+    employmentIncomeMode: {
+      title: string;
+      replaceOptionTitle: string;
+      replaceOptionDescription: string;
+      addOptionTitle: string;
+      addOptionDescription: string;
+    };
+    /**
+     * Employment's own result labels — replaces `budgetImpact` above for
+     * `contractType === "employment"` (see requirement: employment must
+     * never show `contractIncomeRatioLabel`/`totalCommitmentRatioLabel`/
+     * `budgetImpact.title`, all of which frame this as a cost).
+     */
+    employmentBudgetImpact: {
+      title: string;
+      incomeBeforeLabel: string;
+      incomeAfterLabel: string;
+      incomeChangeLabel: string;
+      remainingBeforeLabel: string;
+      remainingAfterLabel: string;
+      incomeChangePercentageLabel: string;
+      savingsAfterLabel: string;
+      /** Shown instead of a percentage when `currentMonthlyIncome` is 0 — never `NaN`/`Infinity`. */
+      percentageUnavailable: string;
     };
     /** Sections 2-4 — AI-interpreted, grounded insights rendered by PersonalizedAnalysisSection. */
     personalizedAnalysis: {
@@ -210,6 +259,16 @@ const AR: ResultsCopy = {
     },
   },
 
+  employmentFinances: {
+    whatYouWillReceiveTitle: "ما ستحصل عليه",
+    compensationBreakdownTitle: "مكونات الأجر",
+    conditionalOrNonGuaranteedTitle: "المبالغ المشروطة أو غير المضمونة",
+    conditionalOrNonGuaranteedNotice: "هذه المبالغ مرتبطة بوقوع أحداث أو شروط معينة، وليست مبالغ مضمونة.",
+    potentialDeductionsTitle: "الاستقطاعات أو الالتزامات المحتملة",
+    potentialDeductionsNotice: "هذه مبالغ قد تُستقطع منك أو تصبح التزاماً عليك في حالات معينة، وليست مؤكدة الحدوث.",
+    otherBenefitsTitle: "المزايا الأخرى",
+  },
+
   financialAnalysis: {
     introTitle: "كيف سيؤثر هذا العقد على ميزانيتك؟",
     introBody: "أدخل معلومات مالية بسيطة لنقارن التزامات العقد بوضعك المالي.",
@@ -230,6 +289,24 @@ const AR: ResultsCopy = {
       contractIncomeRatioLabel: "نسبة التزام العقد الجديد من الدخل",
       totalCommitmentRatioLabel: "نسبة إجمالي الالتزامات الشهرية بعد العقد من الدخل",
       savingsLabel: "المدخرات: قبل → بعد دفعات البداية",
+    },
+    employmentIncomeMode: {
+      title: "كيف سيؤثر راتب هذا العقد على دخلك الحالي؟",
+      replaceOptionTitle: "سيستبدل دخلي الحالي",
+      replaceOptionDescription: "اختر هذا الخيار إذا كنت ستترك وظيفتك الحالية ويصبح راتب العقد الجديد هو دخلك الأساسي.",
+      addOptionTitle: "سيكون دخلًا إضافيًا",
+      addOptionDescription: "اختر هذا الخيار إذا كنت ستحتفظ بدخلك الحالي وسيُضاف إليه راتب العقد الجديد.",
+    },
+    employmentBudgetImpact: {
+      title: "أثر الوظيفة على ميزانيتك",
+      incomeBeforeLabel: "الدخل الشهري قبل العقد",
+      incomeAfterLabel: "الدخل الشهري بعد العقد",
+      incomeChangeLabel: "الزيادة أو النقص في الدخل",
+      remainingBeforeLabel: "المتبقي الشهري قبل العقد",
+      remainingAfterLabel: "المتبقي الشهري بعد العقد",
+      incomeChangePercentageLabel: "نسبة تحسن الدخل",
+      savingsAfterLabel: "المدخرات بعد العقد",
+      percentageUnavailable: "غير متاح",
     },
     personalizedAnalysis: {
       personalImpactTitle: "كيف يؤثر العقد عليك؟",
@@ -326,6 +403,16 @@ const EN: ResultsCopy = {
     },
   },
 
+  employmentFinances: {
+    whatYouWillReceiveTitle: "What you will receive",
+    compensationBreakdownTitle: "Compensation breakdown",
+    conditionalOrNonGuaranteedTitle: "Conditional or non-guaranteed amounts",
+    conditionalOrNonGuaranteedNotice: "These amounts depend on specific events or conditions — they are not guaranteed.",
+    potentialDeductionsTitle: "Potential deductions or obligations",
+    potentialDeductionsNotice: "These are amounts that could be deducted from you or become your obligation in certain cases — they are not confirmed.",
+    otherBenefitsTitle: "Other benefits",
+  },
+
   financialAnalysis: {
     introTitle: "How will this contract affect your budget?",
     introBody: "Enter some simple financial information so we can compare the contract's obligations with your financial situation.",
@@ -346,6 +433,24 @@ const EN: ResultsCopy = {
       contractIncomeRatioLabel: "New contract monthly payment as a percentage of income",
       totalCommitmentRatioLabel: "Total monthly obligations after contract as a percentage of income",
       savingsLabel: "Savings: before → after start payments",
+    },
+    employmentIncomeMode: {
+      title: "How will this contract salary affect your current income?",
+      replaceOptionTitle: "This salary will replace my current income",
+      replaceOptionDescription: "Choose this if you will leave your current job and the new contract salary will become your primary income.",
+      addOptionTitle: "This salary will be additional income",
+      addOptionDescription: "Choose this if you will keep your current income and add the new contract salary to it.",
+    },
+    employmentBudgetImpact: {
+      title: "How the job affects your budget",
+      incomeBeforeLabel: "Monthly income before the contract",
+      incomeAfterLabel: "Monthly income after the contract",
+      incomeChangeLabel: "Income increase or decrease",
+      remainingBeforeLabel: "Monthly remaining before the contract",
+      remainingAfterLabel: "Monthly remaining after the contract",
+      incomeChangePercentageLabel: "Income improvement percentage",
+      savingsAfterLabel: "Savings after the contract",
+      percentageUnavailable: "Unavailable",
     },
     personalizedAnalysis: {
       personalImpactTitle: "How does the contract affect you?",

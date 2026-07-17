@@ -341,6 +341,24 @@ const INFORMATIONAL_TYPE_CONCEPTS: Record<InformationalAmountType, CanonicalConc
   stated_total_cost: "other",
   rate: "interest_rate",
   asset_value: "asset_value",
+  // A recurring obligation restated at another cadence (e.g. a lease's
+  // annual rent alongside its monthly rent) — reuses the existing
+  // `annual_rent` concept/label so it displays exactly like any other
+  // annual-rent fact, while never being a `PaymentObligation` itself (see
+  // `@workspace/financial-metrics`'s `applyRecurringEquivalenceReclassification`).
+  annual_equivalent: "annual_rent",
+  // A contract's own stated total due at signing — shown under its own
+  // stated label ("other"), never merged into a fee/obligation concept.
+  stated_due_at_signing: "other",
+  // One individual guaranteed salary component (base salary, a housing/
+  // transportation allowance, ...) — mapped to "other" deliberately, so
+  // `conceptLabel()` (ContractFinancesTab.tsx) shows each component's own
+  // specific stated label ("Base salary", "Housing allowance", ...)
+  // instead of one shared generic label that would erase the distinction.
+  salary_component: "other",
+  // An employment contract's own stated total fixed monthly compensation —
+  // shown under its own stated label, same rationale as `salary_component`.
+  total_fixed_compensation: "other",
 };
 
 /**
@@ -374,7 +392,17 @@ export function resolveCanonicalConcept(item: NormalizedFinancialItem, contractT
     return genericLabelConcept;
   }
 
-  if (item.source === "penalty" || item.financialRole === "conditional_cost") {
+  // A penalty-sourced item can flow TO the user in an employment contract
+  // (e.g. termination compensation the employer owes the employee) rather
+  // than being a cost the user pays — `source === "penalty"` alone must
+  // never force it into "conditional_payment", or it would both mislabel
+  // the direction and let it collide (by amount) with an unrelated
+  // employee-owed deduction. It falls through to "other" below instead, the
+  // same resolution already used for every other conditional-income item.
+  if (item.source === "penalty" && item.financialRole !== "conditional_income") {
+    return "conditional_payment";
+  }
+  if (item.financialRole === "conditional_cost") {
     return "conditional_payment";
   }
   if (item.financialRole === "recurring_outflow") {
@@ -445,7 +473,13 @@ function hasRenderableAmount(item: NormalizedFinancialItem): boolean {
 }
 
 function dedupKey(conceptId: CanonicalConceptId, currency: string | null, amountValue: number | null): string | null {
-  if (currency === null || amountValue === null || amountValue === 0) {
+  // "other" is a catch-all bucket, not a specific semantic fact — two "other"
+  // items sharing an amount are not necessarily the same fact (e.g. an
+  // employment contract's notice-period deduction and termination
+  // compensation can both be 24,000 SAR while representing opposite-direction
+  // facts). Only a concept id that resolved to something specific is a safe
+  // basis for merging by amount alone.
+  if (conceptId === "other" || currency === null || amountValue === null || amountValue === 0) {
     return null;
   }
   return `${conceptId}|${currency}|${amountValue.toFixed(2)}`;
@@ -553,7 +587,24 @@ export function selectApplicableMonthlyOutflow(concepts: readonly FinancialConce
  * payment is excluded automatically, by role, with no hardcoded concept-id
  * exception needed here.
  */
-export function selectApplicableUpfrontLiquidity(concepts: readonly FinancialConceptItem[]): CurrencyAmount | null {
+function sumKnownAmounts(items: readonly FinancialConceptItem[]): { total: number; currency: string | null } | null {
+  const known = items.filter((item) => item.amount.value !== null && item.amount.currency !== null);
+  if (known.length === 0) {
+    return null;
+  }
+  const currencies = new Set(known.map((item) => item.amount.currency));
+  if (currencies.size > 1) {
+    return null;
+  }
+  return { total: known.reduce((sum, item) => sum + (item.amount.value as number), 0), currency: [...currencies][0] as string };
+}
+
+const AMOUNT_CONSISTENCY_EPSILON = 0.01;
+
+export function selectApplicableUpfrontLiquidity(
+  concepts: readonly FinancialConceptItem[],
+  contractType?: ContractType,
+): CurrencyAmount | null {
   const qualifying = concepts.filter(
     (item) =>
       item.bucket === "guaranteed" &&
@@ -561,15 +612,146 @@ export function selectApplicableUpfrontLiquidity(concepts: readonly FinancialCon
       item.amount.value !== null &&
       item.amount.currency !== null,
   );
-  if (qualifying.length === 0) {
+  const narrow = sumKnownAmounts(qualifying);
+  const narrowResult = narrow && narrow.total > 0 && narrow.currency !== null ? { value: narrow.total, currency: narrow.currency } : null;
+
+  // A contract's own stated "total due at signing" is preferred over the
+  // narrower reconstruction above ONLY when it is arithmetically consistent
+  // with a wider, still-conservative reconstruction of what is genuinely
+  // paid now — this never invents a figure, it only trusts the contract's
+  // own stated total once it is corroborated by the contract's own itemized
+  // facts. The wider reconstruction additionally includes: (a) every
+  // guaranteed one-time item whose due-now timing wasn't explicitly
+  // restated (role `one_time_outflow`) — a flat one-time fee with no
+  // renewal/end-of-term wording is virtually always paid at signing; and
+  // (b) for a lease specifically, one monthly-rent-equivalent payment,
+  // since a lease's first rent payment is conventionally due at signing
+  // alongside the deposit/fees, in addition to being the first of the
+  // recurring schedule (see the product requirement this encodes: the
+  // first month's rent affects immediate liquidity without ever being
+  // double-counted in the recurring commitment or total cost).
+  const statedDueAtSigning = concepts.find(
+    (item) => item.informationalAmountType === "stated_due_at_signing" && item.amount.value !== null && item.amount.currency !== null,
+  );
+  if (statedDueAtSigning) {
+    const oneTimeOutflowItems = concepts.filter(
+      (item) => item.bucket === "guaranteed" && item.financialRole === "one_time_outflow" && item.amount.value !== null && item.amount.currency !== null,
+    );
+    const wideItems = [...qualifying, ...oneTimeOutflowItems];
+    if (contractType === "lease") {
+      const monthlyRent = concepts.find(
+        (item) =>
+          item.bucket === "guaranteed" &&
+          item.financialRole === "recurring_outflow" &&
+          item.conceptId === "monthly_rent" &&
+          item.amount.value !== null &&
+          item.amount.currency !== null,
+      );
+      if (monthlyRent) {
+        wideItems.push(monthlyRent);
+      }
+    }
+    const wide = sumKnownAmounts(wideItems);
+    if (
+      wide &&
+      wide.currency !== null &&
+      wide.currency === statedDueAtSigning.amount.currency &&
+      Math.abs(wide.total - (statedDueAtSigning.amount.value as number)) < AMOUNT_CONSISTENCY_EPSILON
+    ) {
+      return { value: wide.total, currency: wide.currency };
+    }
+  }
+
+  return narrowResult;
+}
+
+/**
+ * The canonical guaranteed monthly employment income (see
+ * `@workspace/financial-metrics`'s `applyEmploymentClassification`, which
+ * synthesizes exactly one `monthly_income`-typed informational amount for
+ * an employment contract — preferring a stated total fixed compensation
+ * fact when consistent with the sum of guaranteed salary components,
+ * otherwise the component sum itself). Returns `null` when the contract
+ * states no guaranteed compensation at all.
+ */
+export function selectGuaranteedEmploymentIncome(concepts: readonly FinancialConceptItem[]): CurrencyAmount | null {
+  const canonical = concepts.find(
+    (item) => item.informationalAmountType === "monthly_income" && item.amount.value !== null && item.amount.currency !== null,
+  );
+  if (!canonical) {
     return null;
   }
-  const currencies = new Set(qualifying.map((item) => item.amount.currency));
-  if (currencies.size > 1) {
-    return null;
+  return { value: canonical.amount.value as number, currency: canonical.amount.currency as string };
+}
+
+// ---------------------------------------------------------------------------
+// Employment-only financial grouping ("Your Compensation") — an employment
+// contract's money flows in fundamentally different directions than every
+// other contract type (income, not cost), so it gets its own dedicated
+// 5-group model instead of the generic 6-group `ContractFinancialGroup`
+// above. Used only when `contractType === "employment"` (see
+// `ContractFinancesTab.tsx`) — every other contract type's grouping is
+// completely unaffected.
+// ---------------------------------------------------------------------------
+
+export type EmploymentFinancialGroup =
+  | "whatYouWillReceive"
+  | "compensationBreakdown"
+  | "conditionalOrNonGuaranteed"
+  | "potentialDeductions"
+  | "otherBenefits";
+
+/**
+ * Classifies a single financial concept item into one of the 5 employment-
+ * specific display groups. Priority order: (1) the canonical guaranteed
+ * total ("What you will receive"); (2) an individual guaranteed salary
+ * component ("Compensation breakdown"); (3) a conditional amount that flows
+ * TO the employee — a bonus, or a termination-compensation entitlement
+ * ("Conditional or non-guaranteed amounts"); (4) a conditional amount owed
+ * BY the employee — a notice-period deduction, a statutory/social-insurance
+ * deduction ("Potential deductions or obligations"); (5) a non-cash/
+ * qualitative benefit ("Other benefits"); (6) anything else, by its own
+ * bucket, as a safe fallback.
+ */
+export function resolveEmploymentFinancialGroup(item: FinancialConceptItem): EmploymentFinancialGroup {
+  if (item.informationalAmountType === "monthly_income") {
+    return "whatYouWillReceive";
   }
-  const total = qualifying.reduce((sum, item) => sum + (item.amount.value as number), 0);
-  return total > 0 ? { value: total, currency: [...currencies][0] as string } : null;
+  if (item.informationalAmountType === "salary_component" || item.informationalAmountType === "total_fixed_compensation") {
+    return "compensationBreakdown";
+  }
+  if (item.financialRole === "conditional_income") {
+    return "conditionalOrNonGuaranteed";
+  }
+  if (item.financialRole === "conditional_cost") {
+    return "potentialDeductions";
+  }
+  if (item.financialRole === "benefit") {
+    return "otherBenefits";
+  }
+  if (item.bucket === "guaranteed") {
+    return "compensationBreakdown";
+  }
+  if (item.bucket === "conditional") {
+    return "conditionalOrNonGuaranteed";
+  }
+  return "otherBenefits";
+}
+
+/**
+ * Groups an already-built, deduplicated concept list by employment display
+ * group, dropping any group that ends up empty — same convention as
+ * `groupContractFinancialConcepts`.
+ */
+export function groupEmploymentFinancialConcepts(
+  concepts: readonly FinancialConceptItem[],
+): Partial<Record<EmploymentFinancialGroup, FinancialConceptItem[]>> {
+  const groups: Partial<Record<EmploymentFinancialGroup, FinancialConceptItem[]>> = {};
+  for (const item of concepts) {
+    const group = resolveEmploymentFinancialGroup(item);
+    (groups[group] ??= []).push(item);
+  }
+  return groups;
 }
 
 // ---------------------------------------------------------------------------

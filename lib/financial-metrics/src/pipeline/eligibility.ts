@@ -122,6 +122,8 @@ const ROLES_NOT_ELIGIBLE_AS_PAYMENT_OBLIGATIONS: ReadonlySet<CandidateSemanticRo
   "credit_limit",
   "coverage_limit",
   "income",
+  "conditional_income",
+  "non_cash_benefit",
 ]);
 
 const CONTEXTS_NOT_ELIGIBLE_AS_PAYMENT_OBLIGATIONS: ReadonlySet<CandidateContext> = new Set([

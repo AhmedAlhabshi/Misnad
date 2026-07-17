@@ -2,7 +2,8 @@ import type { ContractUnderstanding } from "@workspace/contract-schema";
 import type { Confidence, FeeType, ObligationType, PaymentFrequency, PenaltyType } from "../enums";
 import { normalizeCurrencyCode, sanitizeNumericAmount } from "../normalize/money";
 import { isPercentCurrencyText, normalizePercentageValue } from "../normalize/percentages";
-import { classifyFrequencyText } from "../normalize/text";
+import { classifyFrequencyText, containsAnyKeyword } from "../normalize/text";
+import { applyEmploymentClassification } from "./employmentClassification";
 import {
   classifyFeeTypeText,
   classifyObligationTypeText,
@@ -14,6 +15,7 @@ import {
   inferRefundableFromText,
   isAssetValueText,
   isScenarioBalanceText,
+  isStatedDueAtSigningText,
   isStatedTotalCostText,
   type PaymentTiming,
 } from "./classify";
@@ -74,7 +76,20 @@ export type SpecialValueKey =
   | "statedTotalCost"
   | "insuranceDeductible"
   | "coverageAmount"
-  | "rate";
+  | "rate"
+  /**
+   * The same recurring obligation restated at a different cadence (e.g. a
+   * lease's annual rent alongside its monthly rent) — see
+   * `applyRecurringEquivalenceReclassification` below. Never a second
+   * `PaymentObligation`; kept visible via `informationalAmounts[]` only.
+   */
+  | "recurringEquivalent"
+  /** A contract's own stated total due at signing/contract start — see `isStatedDueAtSigningText`. */
+  | "statedDueAtSigning"
+  /** One individual guaranteed, fixed employment-compensation component (base salary, a housing/transportation allowance, ...) — see `pipeline/employmentClassification.ts`. */
+  | "salaryComponent"
+  /** An employment contract's own stated total fixed monthly compensation — see `isStatedTotalCompensationText`. */
+  | "statedTotalCompensation";
 
 export type CandidateSourceKind =
   | "type_details"
@@ -362,6 +377,126 @@ function extractStatedTotalCostCandidates(input: ContractUnderstanding): Candida
   return candidates;
 }
 
+/** Sibling to `extractStatedTotalCostCandidates` for a narrower "due at signing" total — see `isStatedDueAtSigningText`. */
+function extractStatedDueAtSigningCandidates(input: ContractUnderstanding): Candidate[] {
+  const candidates: Candidate[] = [];
+
+  input.financialObligations.forEach((obligation, index) => {
+    if (!isStatedDueAtSigningText(obligation.description)) {
+      return;
+    }
+    const amountValue = sanitizeNumericAmount(obligation.amount);
+    if (amountValue === null) {
+      return;
+    }
+    candidates.push({
+      ...baseCandidate("financial_obligation", `financialObligations[${index}]`),
+      targetKind: "special",
+      specialKey: "statedDueAtSigning",
+      label: obligation.description,
+      amountValue,
+      currency: normalizeCurrencyCode(obligation.currency),
+      evidence: obligation.description,
+    });
+  });
+
+  input.extractedNumbers.forEach((extracted, index) => {
+    if (!isStatedDueAtSigningText(extracted.label)) {
+      return;
+    }
+    const currency = normalizeCurrencyCode(extracted.unit);
+    const amountValue = sanitizeNumericAmount(extracted.value);
+    if (amountValue === null) {
+      return;
+    }
+    candidates.push({
+      ...baseCandidate("extracted_number", `extractedNumbers[${index}]`),
+      targetKind: "special",
+      specialKey: "statedDueAtSigning",
+      label: extracted.label,
+      amountValue,
+      currency,
+      evidence: extracted.label,
+    });
+  });
+
+  return candidates;
+}
+
+const RECURRING_EQUIVALENCE_LABEL_KEYWORDS = ["rent", "lease", "إيجار", "ايجار"];
+
+/** True when a candidate's own label/evidence text reads as rent/lease wording — the only label signal `applyRecurringEquivalenceReclassification` trusts (never "same amount, same frequency" alone). */
+function looksLikeRentLabel(candidate: Candidate): boolean {
+  const text = `${candidate.label} ${candidate.evidence ?? ""}`;
+  return containsAnyKeyword(text, RECURRING_EQUIVALENCE_LABEL_KEYWORDS);
+}
+
+const RECURRING_EQUIVALENCE_AMOUNT_EPSILON = 0.01;
+
+/**
+ * Lease-only: a lease's annual rent and monthly rent are the same real
+ * obligation restated at two cadences (annual = monthly × 12) — without this
+ * pass, a generic `financialObligations[]`/`extractedNumbers[]` entry
+ * stating the annual figure survives classification as its own
+ * `frequency: "annual"` recurring payment (see `classifyObligationTypeText`'s
+ * frequency fallback), and — because it never shares a `structuralGroupKey`
+ * with the monthly-rent candidate (different amount, different frequency —
+ * see `pipeline/dedupe.ts`) — the generic `deduplicateCandidates` pass can
+ * never recognize it as a duplicate. Left uncorrected,
+ * `calculateRecurringCommitment` sums both the monthly figure and the
+ * annual figure's monthly-equivalent, silently doubling the lease's real
+ * recurring commitment (and, downstream, `totalCost`/`ratios`, which both
+ * read from the same `recurringCommitment.monthlyEquivalent`).
+ *
+ * Scoped narrowly to avoid any risk to auto-finance or other contract
+ * types: only runs for `contractType === "lease"`, only matches a candidate
+ * whose amount is *exactly* the canonical `typeDetails.monthlyRent` × 12
+ * (arithmetic consistency), whose frequency is `"annual"`, and whose own
+ * label/evidence text reads as rent/lease wording (`looksLikeRentLabel`) —
+ * never merely "same amount, same frequency" (the existing `canMerge`'s own
+ * conservatism, per its doc comment, is exactly why that alone would be
+ * unsafe as a general rule). The matched candidate is never deleted — it is
+ * reclassified into the `recurringEquivalent` special value so it still
+ * surfaces in `informationalAmounts[]` (visible to the user, e.g. "Annual
+ * rent: 36,000 SAR") while being excluded from `PaymentObligation[]` and
+ * therefore from every monetary calculation.
+ */
+function applyRecurringEquivalenceReclassification(
+  candidates: Candidate[],
+  contractType: ContractUnderstanding["typeDetails"]["contractType"],
+): Candidate[] {
+  if (contractType !== "lease") {
+    return candidates;
+  }
+
+  const monthlyRent = candidates.find(
+    (candidate) => candidate.sourceField === "typeDetails.monthlyRent" && candidate.amountValue !== null,
+  );
+  if (!monthlyRent || monthlyRent.amountValue === null) {
+    return candidates;
+  }
+
+  const expectedAnnual = monthlyRent.amountValue * 12;
+
+  return candidates.map((candidate) => {
+    if (candidate === monthlyRent) return candidate;
+    if (candidate.targetKind !== "obligation") return candidate;
+    if (candidate.frequency !== "annual") return candidate;
+    if (candidate.amountValue === null || Math.abs(candidate.amountValue - expectedAnnual) > RECURRING_EQUIVALENCE_AMOUNT_EPSILON) {
+      return candidate;
+    }
+    if (!looksLikeRentLabel(candidate)) return candidate;
+
+    return {
+      ...candidate,
+      targetKind: "special",
+      specialKey: "recurringEquivalent",
+      semanticRole: "reference_value",
+      context: "reference_only",
+    };
+  });
+}
+
 /**
  * Extracts contract-type-specific candidates from `typeDetails`. Each
  * contract type exposes a different, explicit set of numeric fields (see
@@ -501,9 +636,16 @@ function extractFromTypeDetails(input: ContractUnderstanding): Candidate[] {
       break;
     }
     case "employment": {
+      // Base salary is one guaranteed salary *component*, not itself the
+      // canonical guaranteed monthly income — `applyEmploymentClassification`
+      // (below) derives the canonical figure from this plus any other
+      // guaranteed components (housing/transportation allowances, ...) and
+      // a stated total fixed compensation fact, then injects the single
+      // canonical `monthlyIncome`-keyed candidate `resolveMonthlyIncome`
+      // (engine.ts) already knows how to consume.
       push(fromTypeDetailsAmount("typeDetails.baseSalary", "Base salary", details.baseSalary, {
         targetKind: "special",
-        specialKey: "monthlyIncome",
+        specialKey: "salaryComponent",
         frequency: classifyFrequencyText(details.salaryFrequency),
       }));
       break;
@@ -532,6 +674,10 @@ const SPECIAL_KEY_TO_ROLE: Record<SpecialValueKey, CandidateSemanticRole> = {
   insuranceDeductible: "conditional_fee",
   coverageAmount: "coverage_limit",
   rate: "rate",
+  recurringEquivalent: "reference_value",
+  statedDueAtSigning: "reference_value",
+  salaryComponent: "reference_value",
+  statedTotalCompensation: "reference_value",
 };
 
 /**
@@ -629,7 +775,10 @@ export function extractCandidates(input: ContractUnderstanding): ExtractedCandid
     ...extractFromPenalties(input),
     ...extractFromExtractedNumbers(input),
     ...extractStatedTotalCostCandidates(input),
+    ...extractStatedDueAtSigningCandidates(input),
   ].map(assignSemantics);
 
-  return { candidates };
+  const leaseReclassified = applyRecurringEquivalenceReclassification(candidates, input.typeDetails.contractType);
+  const employmentReclassified = applyEmploymentClassification(leaseReclassified, input.typeDetails.contractType);
+  return { candidates: employmentReclassified };
 }

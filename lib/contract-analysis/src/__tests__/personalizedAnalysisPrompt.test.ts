@@ -43,6 +43,7 @@ const REQUEST: PersonalizedAnalysisRequest = personalizedAnalysisRequestSchema.p
     remainingSavings: null,
     emergencyCoverageMonths: null,
   },
+  employmentIncomeMode: "replace_current_income",
 });
 
 function testSystemInstructionsForbidCreditDecisionLanguage(): void {
@@ -109,8 +110,14 @@ function testSystemInstructionsDistinguishTheTwoRatios(): void {
 }
 
 function testPromptLabelsBothRatiosDistinctly(): void {
+  // Both ratios are a non-employment concept (a monthly commitment the user
+  // pays) — employment uses entirely different, income-oriented framing
+  // (see `formatEmploymentBudgetMetricsSection`), so this test exercises a
+  // non-employment contract type instead of the shared `REQUEST` fixture.
   const requestWithBothRatios = personalizedAnalysisRequestSchema.parse({
     ...REQUEST,
+    contractType: "personal_finance",
+    employmentIncomeMode: null,
     budgetMetrics: { ...REQUEST.budgetMetrics, contractIncomeRatio: 24, totalCommitmentRatio: 36.7 },
   });
   const prompt = buildPersonalizedAnalysisPrompt(requestWithBothRatios);

@@ -190,6 +190,8 @@ function baseAnalysis(overrides: Partial<ContractAnalysisResult> = {}): Contract
 const EMPTY_SESSION: PersonalizedAnalysisSessionState = {
   form: { monthlyIncome: "", essentialExpenses: "", existingDebt: "", savings: "" },
   budgetResult: null,
+  employmentIncomeMode: null,
+  employmentBudgetResult: null,
   status: "idle",
   result: null,
 };
@@ -204,10 +206,41 @@ function completedSession(overrides: Partial<PersonalizedAnalysisSessionState> =
       totalCommitmentRatio: 29,
       remainingSavings: 15650,
       emergencyCoverageMonths: 2.5,
+      monthlyContractCommitment: 2400,
+      totalMonthlyOutflowBeforeContract: 3500,
+      totalMonthlyOutflowAfterContract: 5900,
+      remainingMonthlyBeforeContract: 6500,
+      remainingMonthlyAfterContract: 4100,
+      newContractBurdenRatio: 24,
+      totalOutflowRatioAfterContract: 59,
+      initialCashRequired: 4350,
+      savingsAfterInitialCash: 15650,
+      emergencyFundCoverageMonths: 2.5,
     },
+    employmentIncomeMode: null,
+    employmentBudgetResult: null,
     status: "success",
     result: {
       personalImpact: [{ title: "Affordable", explanation: "This contract fits comfortably within your budget.", basis: "budget" }],
+      thingsToWatch: [],
+      beforeYouSign: [],
+    },
+    ...overrides,
+  };
+}
+
+function completedEmploymentSession(
+  employmentBudgetResult: NonNullable<PersonalizedAnalysisSessionState["employmentBudgetResult"]>,
+  overrides: Partial<PersonalizedAnalysisSessionState> = {},
+): PersonalizedAnalysisSessionState {
+  return {
+    form: { monthlyIncome: "10000", essentialExpenses: "4000", existingDebt: "1000", savings: "30000" },
+    budgetResult: null,
+    employmentIncomeMode: "replace_current_income",
+    employmentBudgetResult,
+    status: "success",
+    result: {
+      personalImpact: [{ title: "Higher income", explanation: "Your new guaranteed salary is higher than your current income.", basis: "income" }],
       thingsToWatch: [],
       beforeYouSign: [],
     },
@@ -494,6 +527,57 @@ export function run(): void {
     assert.doesNotMatch(data.keyFinancialFigures[0]!.label, /[؀-ۿ]/, "figure labels must not contain Arabic when language is en");
   }
   console.log("PASS buildReportSummaryData: English labels/copy used when language is en");
+
+  // --- employment: personalized PDF section uses employmentBudgetResult,
+  // never the generic obligation-oriented `personalized` shape -------------
+  {
+    const analysis = baseAnalysis({ contractType: "employment", typeDetails: { contractType: "employment" } });
+    const session = completedEmploymentSession({
+      incomeBefore: 10000,
+      incomeAfter: 12000,
+      remainingBefore: 5000,
+      remainingAfter: 7000,
+      incomeChange: 2000,
+      incomeChangePercentage: 20,
+      savingsAfterContract: 30000,
+      emergencyFundCoverageMonths: 6,
+    });
+    const data = buildReportSummaryData({
+      language: "en",
+      analysis,
+      financialMetrics: null,
+      includePersonalized: true,
+      personalizedSession: session,
+      now,
+    });
+    assert.equal(data.personalized, undefined, "employment must never produce the generic obligation-oriented personalized section");
+    assert.ok(data.employmentPersonalized, "employment must produce its own employmentPersonalized PDF section");
+    assert.match(data.employmentPersonalized!.incomeBefore, /10,?000/);
+    assert.match(data.employmentPersonalized!.incomeAfter, /12,?000/);
+    assert.match(data.employmentPersonalized!.incomeChange, /2,?000/);
+    assert.match(data.employmentPersonalized!.incomeChangePercentage, /20/);
+    assert.match(data.employmentPersonalized!.remainingBefore, /5,?000/);
+    assert.match(data.employmentPersonalized!.remainingAfter, /7,?000/);
+    assert.match(data.employmentPersonalized!.savingsAfter, /30,?000/);
+  }
+  console.log("PASS buildReportSummaryData: employment PDF section uses employmentBudgetResult, never the generic obligation shape");
+
+  // --- employment: incomplete employment session (no employmentBudgetResult
+  // yet) must never produce a fabricated employmentPersonalized section ----
+  {
+    const analysis = baseAnalysis({ contractType: "employment", typeDetails: { contractType: "employment" } });
+    const data = buildReportSummaryData({
+      language: "en",
+      analysis,
+      financialMetrics: null,
+      includePersonalized: true,
+      personalizedSession: EMPTY_SESSION,
+      now,
+    });
+    assert.equal(data.employmentPersonalized, undefined, "an incomplete employment session must never be force-included");
+    assert.equal(data.personalized, undefined);
+  }
+  console.log("PASS buildReportSummaryData: incomplete employment session never fabricates a PDF section");
 
   console.log("PASS reportSummary.test.ts");
 }

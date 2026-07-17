@@ -36,6 +36,17 @@ export interface ReportSummaryCopy {
       remainingMonthlyAmount: string;
       conclusionLabel: string;
     };
+    /** Employment's own PDF section labels — replaces `personalized` above for `contractType === "employment"`. */
+    employmentPersonalized: {
+      incomeBefore: string;
+      incomeAfter: string;
+      incomeChange: string;
+      incomeChangePercentage: string;
+      remainingBefore: string;
+      remainingAfter: string;
+      savingsAfter: string;
+      conclusionLabel: string;
+    };
     riskLabels: { high: string; medium: string; low: string };
     unavailable: string;
     footerDisclaimer: string;
@@ -76,6 +87,16 @@ const AR: ReportSummaryCopy = {
       totalMonthlyObligations: "إجمالي الالتزامات الشهرية بعد العقد",
       obligationToIncomeRatio: "نسبة الالتزامات إلى الدخل",
       remainingMonthlyAmount: "المتبقي من الدخل الشهري",
+      conclusionLabel: "خلاصة التحليل الشخصي",
+    },
+    employmentPersonalized: {
+      incomeBefore: "الدخل الشهري قبل العقد",
+      incomeAfter: "الدخل الشهري بعد العقد",
+      incomeChange: "الزيادة أو النقص في الدخل",
+      incomeChangePercentage: "نسبة تحسن الدخل",
+      remainingBefore: "المتبقي الشهري قبل العقد",
+      remainingAfter: "المتبقي الشهري بعد العقد",
+      savingsAfter: "المدخرات بعد العقد",
       conclusionLabel: "خلاصة التحليل الشخصي",
     },
     riskLabels: { high: "مرتفعة", medium: "متوسطة", low: "منخفضة" },
@@ -124,6 +145,16 @@ const EN: ReportSummaryCopy = {
       totalMonthlyObligations: "Total monthly obligations after the contract",
       obligationToIncomeRatio: "Obligation-to-income ratio",
       remainingMonthlyAmount: "Remaining monthly amount",
+      conclusionLabel: "Personalized analysis conclusion",
+    },
+    employmentPersonalized: {
+      incomeBefore: "Monthly income before the contract",
+      incomeAfter: "Monthly income after the contract",
+      incomeChange: "Income increase or decrease",
+      incomeChangePercentage: "Income improvement percentage",
+      remainingBefore: "Monthly remaining before the contract",
+      remainingAfter: "Monthly remaining after the contract",
+      savingsAfter: "Savings after the contract",
       conclusionLabel: "Personalized analysis conclusion",
     },
     riskLabels: { high: "High", medium: "Medium", low: "Low" },

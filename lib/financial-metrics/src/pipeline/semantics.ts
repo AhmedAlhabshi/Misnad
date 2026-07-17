@@ -25,6 +25,10 @@ export type CandidateSemanticRole =
   | "coverage_limit"
   | "deposit"
   | "rate"
+  /** Non-guaranteed, performance-dependent employment compensation (a bonus, commission, uncertain overtime pay) — flows to the user, never a cost, never counted as guaranteed income. */
+  | "conditional_income"
+  /** A non-cash or qualitative employment benefit (medical insurance, paid leave, an overtime entitlement) — never a monthly cost or a cash amount to sum. */
+  | "non_cash_benefit"
   | "unknown";
 
 /**
@@ -96,6 +100,10 @@ export function toFinancialRole(
       return refundable === true ? "refundable" : "upfront_liquidity";
     case "rate":
       return "rate_or_percentage";
+    case "conditional_income":
+      return "conditional_income";
+    case "non_cash_benefit":
+      return "benefit";
     case "unknown":
     default:
       return "other";

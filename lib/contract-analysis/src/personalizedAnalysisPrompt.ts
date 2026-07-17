@@ -56,6 +56,7 @@ Rules you must follow strictly:
 - Do not provide legal advice. Do not claim this analysis substitutes for review by a qualified professional.
 - Distinguish clearly between what is guaranteed (will definitely happen) and what is conditional (depends on an event) — never present a conditional cost as if it were certain, and never present a guaranteed cost as merely possible.
 - Two DIFFERENT percentages may both be supplied: "new contract monthly payment as a percentage of income" (this contract's own monthly payment ÷ income) and "total monthly obligations after contract as a percentage of income" (existing debt + this contract's monthly payment ÷ income). These are never the same number and never interchangeable. Always refer to each one by its own full distinguishing phrase (or an equally specific paraphrase that keeps the distinction unmistakable) — never call either one just "contract impact" or "monthly obligation ratio", and never use one figure's wording to describe the other's value.
+- An EMPLOYMENT contract is never a cost: it introduces or changes the user's INCOME. Never describe a salary, allowance, or other guaranteed compensation as something the user "pays" or as a fee/cost/expense — describe it as what the user will receive. Never say a salary "reduces savings" or "reduces the monthly remaining amount" unless the supplied figures explicitly show an upfront employee-paid amount. A conditional amount in an employment contract can flow either TO the user (a bonus, a termination compensation entitlement) or FROM the user (e.g. a notice-period deduction) — always describe the correct direction using the concept's own supplied role/label, never assume the "conditional cost" direction by default the way you would for other contract types.
 
 "personalImpact" — concise, grounded statements of what the supplied deterministic metrics/facts mean for THIS user, using the actual numbers. Valid concepts include (not a checklist — only include what the actual contract and calculations support): the change in the user's remaining monthly amount, the effect of upfront/start payments on savings, a future final/balloon payment that requires later planning, a long commitment duration, or the practical effect of a recurring payment. Only include concepts genuinely supported by the supplied data for this contract.
 
@@ -98,7 +99,45 @@ function formatConceptsSection(request: PersonalizedAnalysisRequest): string {
     .join("\n");
 }
 
+const EMPLOYMENT_MODE_LABEL: Record<"replace_current_income" | "add_to_current_income", string> = {
+  replace_current_income: "this salary REPLACES the user's current income (the user will leave their current job)",
+  add_to_current_income: "this salary is ADDITIONAL income on top of the user's current income (the user keeps their current job)",
+};
+
+/**
+ * Employment uses a fundamentally different framing from every other
+ * contract type: the contract changes the user's INCOME, never a monthly
+ * commitment the user pays. `applicableMonthlyOutflow`/`contractIncomeRatio`
+ * are never populated for employment (there is no such commitment) — this
+ * section instead surfaces the employment-only income figures.
+ */
+function formatEmploymentBudgetMetricsSection(request: PersonalizedAnalysisRequest): string {
+  const m = request.budgetMetrics;
+  const currency = m.currency ?? "";
+  const fmt = (value: number | null | undefined): string => (value === null || value === undefined ? "unknown" : `${value} ${currency}`.trim());
+  const fmtPct = (value: number | null | undefined): string => (value === null || value === undefined ? "unknown" : `${value}%`);
+  const fmtMonths = (value: number | null): string => (value === null ? "unknown" : `${value}`);
+  const modeLabel = request.employmentIncomeMode ? EMPLOYMENT_MODE_LABEL[request.employmentIncomeMode] : "unknown";
+
+  return `- Mode selected by the user: ${modeLabel}
+- Monthly income BEFORE this contract: ${fmt(m.incomeBefore)}
+- Monthly income AFTER this contract: ${fmt(m.incomeAfter)}
+- Income change caused by this contract: ${fmt(m.incomeChange)}
+- Income change as a percentage: ${fmtPct(m.incomeChangePercentage)}
+- Essential monthly expenses: ${fmt(m.essentialExpenses)}
+- Existing monthly debt: ${fmt(m.existingMonthlyDebt)}
+- Savings: ${m.savings === null ? "not provided" : fmt(m.savings)}
+- Monthly remaining amount BEFORE this contract: ${fmt(m.availableBeforeContract)}
+- Monthly remaining amount AFTER this contract: ${fmt(m.availableAfterContract)}
+- Savings after this contract (this salary never reduces savings unless an explicit upfront employee payment was found): ${fmt(m.remainingSavings)}
+- Emergency coverage (months the savings would cover essential expenses + existing debt + any confirmed recurring employee deductions): ${fmtMonths(m.emergencyCoverageMonths)}`;
+}
+
 function formatBudgetMetricsSection(request: PersonalizedAnalysisRequest): string {
+  if (request.contractType === "employment") {
+    return formatEmploymentBudgetMetricsSection(request);
+  }
+
   const m = request.budgetMetrics;
   const currency = m.currency ?? "";
   const fmt = (value: number | null): string => (value === null ? "unknown" : `${value} ${currency}`.trim());
@@ -119,6 +158,43 @@ function formatBudgetMetricsSection(request: PersonalizedAnalysisRequest): strin
 - Emergency coverage (months the remaining savings would cover total monthly outflow): ${fmtMonths(m.emergencyCoverageMonths)}`;
 }
 
+const EMPLOYMENT_REPLACE_MODE_INSTRUCTIONS = `This is an EMPLOYMENT contract and the user chose "replace_current_income": the new salary replaces the user's current income entirely (they are leaving their current job). Your analysis must specifically discuss, where the supplied data supports it:
+- Whether the new guaranteed salary is higher or lower than the user's current income, using the actual supplied figures.
+- How the user's monthly remaining balance changes as a result.
+- The distinction between the guaranteed compensation and any non-guaranteed amounts (bonuses, commissions) — never imply a bonus is part of the guaranteed salary.
+- That statutory/social-insurance deductions and the resulting net salary are not known from the figures supplied, when that is the case — never invent a net figure.
+- The probation period, if one was supplied, as a period of relatively higher job-security risk.
+- Termination and notice-period obligations/entitlements, if supplied, kept clearly distinguished by direction (an amount the employee could owe vs. an amount the employee could receive).
+- Any job benefits supplied (e.g. medical insurance, paid leave) as part of the overall picture, never as a monthly cost.`;
+
+const EMPLOYMENT_ADD_MODE_INSTRUCTIONS = `This is an EMPLOYMENT contract and the user chose "add_to_current_income": the new salary is additional income on top of the user's current income (they keep their current job too). Your analysis must specifically discuss, where the supplied data supports it:
+- The total combined monthly income from both sources, using the actual supplied figures.
+- The additional monthly surplus this contract creates.
+- That relying on two simultaneous income sources carries its own sustainability considerations — one of the two may be temporary, conditional, or otherwise less certain than the other, when the supplied facts suggest this.
+- The distinction between the guaranteed compensation and any non-guaranteed amounts (bonuses, commissions).
+- Tax, statutory, or social-insurance deductions where the supplied facts raise them — never invent a net figure that wasn't given.
+- The probation period and termination/notice risks, if supplied.`;
+
+const EMPLOYMENT_RECOMMENDATION_GUIDANCE = `For "beforeYouSign" on an employment contract, ground your advice/questions in the supplied facts, drawing from angles such as (only when actually supported by what was supplied — never invent a fact to justify one of these):
+- Asking for the expected net salary after statutory/social-insurance deductions.
+- Confirming whether allowances are fixed and continue to be paid during leave.
+- Never relying on a performance bonus for essential budgeting, since it is not guaranteed.
+- Confirming the medical-insurance coverage class and which dependents are covered.
+- Recording the notice-period requirement (e.g. a 60-day notice) as a concrete obligation.
+- Understanding the probation-period termination terms specifically.
+- Clarifying how overtime is calculated and approved, if overtime was mentioned.
+- When the mode is "replace_current_income": explicitly comparing the new guaranteed salary with the user's current income.
+- When the mode is "add_to_current_income": confirming whether holding both income sources at once is contractually permitted.`;
+
+function buildEmploymentInstructions(request: PersonalizedAnalysisRequest): string {
+  if (request.contractType !== "employment") {
+    return "";
+  }
+  const modeInstructions =
+    request.employmentIncomeMode === "add_to_current_income" ? EMPLOYMENT_ADD_MODE_INSTRUCTIONS : EMPLOYMENT_REPLACE_MODE_INSTRUCTIONS;
+  return `\n\n${modeInstructions}\n\n${EMPLOYMENT_RECOMMENDATION_GUIDANCE}`;
+}
+
 export function buildPersonalizedAnalysisPrompt(request: PersonalizedAnalysisRequest): string {
   return `Contract type: "${request.contractType}"
 
@@ -136,7 +212,7 @@ Classified financial concepts (role and bucket already determined — "guarantee
 ${formatConceptsSection(request)}
 
 Already-calculated deterministic budget figures for this specific user (do not recompute or alter any of these):
-${formatBudgetMetricsSection(request)}
+${formatBudgetMetricsSection(request)}${buildEmploymentInstructions(request)}
 
 Using ONLY the information above, produce a structured personalized financial analysis matching the required JSON schema exactly: "personalImpact", "thingsToWatch", "beforeYouSign".`;
 }

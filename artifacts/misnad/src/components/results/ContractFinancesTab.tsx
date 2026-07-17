@@ -11,9 +11,11 @@ import {
   buildDurationFacts,
   buildFinancialConcepts,
   groupContractFinancialConcepts,
+  groupEmploymentFinancialConcepts,
   isStatedCapText,
   type ContractFinancialGroup,
   type DurationFact,
+  type EmploymentFinancialGroup,
   type FinancialConceptItem,
 } from "@/lib/financialConcepts";
 import { sanitizeDisplayText } from "@/lib/textSanitization";
@@ -28,6 +30,21 @@ const GROUP_ORDER: ContractFinancialGroup[] = [
   "financingAndCredit",
   "ratesAndPercentages",
   "otherStatedAmounts",
+];
+
+/**
+ * Employment's own 5-group order — completely separate from `GROUP_ORDER`
+ * above, which never runs for `contractType === "employment"` (see
+ * `resolveEmploymentFinancialGroup` in `financialConcepts.ts`). An
+ * employment contract's money is income, never a cost, so it gets its own
+ * framing end-to-end instead of reusing "what you'll pay"/"fees and costs".
+ */
+const EMPLOYMENT_GROUP_ORDER: EmploymentFinancialGroup[] = [
+  "whatYouWillReceive",
+  "compensationBreakdown",
+  "conditionalOrNonGuaranteed",
+  "potentialDeductions",
+  "otherBenefits",
 ];
 
 function GroupAccordion({
@@ -98,8 +115,10 @@ export default function ContractFinancesTab({
     );
   }
 
+  const isEmployment = analysis.contractType === "employment";
   const concepts = buildFinancialConcepts(financialMetrics, analysis.contractType);
-  const groups = groupContractFinancialConcepts(concepts);
+  const groups = isEmployment ? null : groupContractFinancialConcepts(concepts);
+  const employmentGroups = isEmployment ? groupEmploymentFinancialConcepts(concepts) : null;
   const durationFacts = buildDurationFacts(financialMetrics, concepts);
 
   const groupTitles: Record<ContractFinancialGroup, string> = {
@@ -109,6 +128,19 @@ export default function ContractFinancesTab({
     financingAndCredit: copy.finances.financingAndCreditTitle,
     ratesAndPercentages: copy.finances.ratesAndPercentagesTitle,
     otherStatedAmounts: copy.finances.otherStatedAmountsTitle,
+  };
+
+  const employmentGroupTitles: Record<EmploymentFinancialGroup, string> = {
+    whatYouWillReceive: copy.employmentFinances.whatYouWillReceiveTitle,
+    compensationBreakdown: copy.employmentFinances.compensationBreakdownTitle,
+    conditionalOrNonGuaranteed: copy.employmentFinances.conditionalOrNonGuaranteedTitle,
+    potentialDeductions: copy.employmentFinances.potentialDeductionsTitle,
+    otherBenefits: copy.employmentFinances.otherBenefitsTitle,
+  };
+
+  const employmentGroupNotices: Partial<Record<EmploymentFinancialGroup, string>> = {
+    conditionalOrNonGuaranteed: copy.employmentFinances.conditionalOrNonGuaranteedNotice,
+    potentialDeductions: copy.employmentFinances.potentialDeductionsNotice,
   };
 
   function amountCellText(item: FinancialConceptItem): string {
@@ -159,7 +191,9 @@ export default function ContractFinancesTab({
     return `${formatCount(fact.value, language)} ${unitLabel}`;
   }
 
-  const hasAnyFacts = GROUP_ORDER.some((group) => (groups[group]?.length ?? 0) > 0) || durationFacts.length > 0;
+  const hasAnyFacts = isEmployment
+    ? EMPLOYMENT_GROUP_ORDER.some((group) => (employmentGroups?.[group]?.length ?? 0) > 0) || durationFacts.length > 0
+    : GROUP_ORDER.some((group) => (groups?.[group]?.length ?? 0) > 0) || durationFacts.length > 0;
 
   if (!hasAnyFacts) {
     return (
@@ -171,49 +205,95 @@ export default function ContractFinancesTab({
     );
   }
 
+  const employmentIconFor = (group: EmploymentFinancialGroup, item: FinancialConceptItem) => {
+    if (group === "potentialDeductions") return <ShieldAlert size={14} />;
+    if (group === "conditionalOrNonGuaranteed") return item.source === "penalty" ? <ShieldAlert size={14} /> : <Receipt size={14} />;
+    return <Landmark size={14} />;
+  };
+
   return (
     <div dir={language === "ar" ? "rtl" : "ltr"} className="flex flex-col gap-3" data-testid="contract-financial-facts">
-      {GROUP_ORDER.map((group) => {
-        const items = groups[group];
-        if (!items || items.length === 0) {
-          return null;
-        }
-        return (
-          <GroupAccordion
-            key={group}
-            title={groupTitles[group]}
-            expanded={expandedGroups.has(group)}
-            onToggle={() => toggleGroup(group)}
-            testId={`finances-group-${group}`}
-          >
-            {group === "conditionalAmounts" && <p className="text-[12px] text-muted-foreground mb-1">{copy.finances.conditionalAmountsNotice}</p>}
-            {items.map((item) => {
-              const amountText = amountCellText(item);
-              const frequency = frequencyText(item);
-              const trigger = group === "conditionalAmounts" ? sanitizeDisplayText(item.trigger) : null;
-              return (
-                <div key={item.id} data-testid={`finances-item-${item.id}`} className="flex items-start gap-3 py-2 border-b border-white/5 last:border-b-0">
-                  <div className="w-8 h-8 rounded-full bg-indigo-500/15 text-indigo-400 flex items-center justify-center shrink-0">
-                    {group === "conditionalAmounts" ? (
-                      item.source === "penalty" ? <ShieldAlert size={14} /> : <Receipt size={14} />
-                    ) : (
-                      <Landmark size={14} />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0 flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[14px] text-white font-semibold truncate">{conceptLabel(item)}</p>
-                      {frequency && <p className="text-xs text-muted-foreground mt-0.5">{frequency}</p>}
-                      {trigger && <p className="text-xs text-muted-foreground mt-0.5">{trigger}</p>}
+      {isEmployment
+        ? EMPLOYMENT_GROUP_ORDER.map((group) => {
+            const items = employmentGroups?.[group];
+            if (!items || items.length === 0) {
+              return null;
+            }
+            const notice = employmentGroupNotices[group];
+            return (
+              <GroupAccordion
+                key={group}
+                title={employmentGroupTitles[group]}
+                expanded={expandedGroups.has(group)}
+                onToggle={() => toggleGroup(group)}
+                testId={`finances-group-${group}`}
+              >
+                {notice && <p className="text-[12px] text-muted-foreground mb-1">{notice}</p>}
+                {items.map((item) => {
+                  const amountText = amountCellText(item);
+                  const frequency = frequencyText(item);
+                  const trigger =
+                    group === "conditionalOrNonGuaranteed" || group === "potentialDeductions" ? sanitizeDisplayText(item.trigger) : null;
+                  return (
+                    <div key={item.id} data-testid={`finances-item-${item.id}`} className="flex items-start gap-3 py-2 border-b border-white/5 last:border-b-0">
+                      <div className="w-8 h-8 rounded-full bg-indigo-500/15 text-indigo-400 flex items-center justify-center shrink-0">
+                        {employmentIconFor(group, item)}
+                      </div>
+                      <div className="flex-1 min-w-0 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[14px] text-white font-semibold truncate">{conceptLabel(item)}</p>
+                          {frequency && <p className="text-xs text-muted-foreground mt-0.5">{frequency}</p>}
+                          {trigger && <p className="text-xs text-muted-foreground mt-0.5">{trigger}</p>}
+                        </div>
+                        {amountText && <p className="text-[14px] text-white font-bold whitespace-nowrap">{amountText}</p>}
+                      </div>
                     </div>
-                    {amountText && <p className="text-[14px] text-white font-bold whitespace-nowrap">{amountText}</p>}
-                  </div>
-                </div>
-              );
-            })}
-          </GroupAccordion>
-        );
-      })}
+                  );
+                })}
+              </GroupAccordion>
+            );
+          })
+        : GROUP_ORDER.map((group) => {
+            const items = groups?.[group];
+            if (!items || items.length === 0) {
+              return null;
+            }
+            return (
+              <GroupAccordion
+                key={group}
+                title={groupTitles[group]}
+                expanded={expandedGroups.has(group)}
+                onToggle={() => toggleGroup(group)}
+                testId={`finances-group-${group}`}
+              >
+                {group === "conditionalAmounts" && <p className="text-[12px] text-muted-foreground mb-1">{copy.finances.conditionalAmountsNotice}</p>}
+                {items.map((item) => {
+                  const amountText = amountCellText(item);
+                  const frequency = frequencyText(item);
+                  const trigger = group === "conditionalAmounts" ? sanitizeDisplayText(item.trigger) : null;
+                  return (
+                    <div key={item.id} data-testid={`finances-item-${item.id}`} className="flex items-start gap-3 py-2 border-b border-white/5 last:border-b-0">
+                      <div className="w-8 h-8 rounded-full bg-indigo-500/15 text-indigo-400 flex items-center justify-center shrink-0">
+                        {group === "conditionalAmounts" ? (
+                          item.source === "penalty" ? <ShieldAlert size={14} /> : <Receipt size={14} />
+                        ) : (
+                          <Landmark size={14} />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[14px] text-white font-semibold truncate">{conceptLabel(item)}</p>
+                          {frequency && <p className="text-xs text-muted-foreground mt-0.5">{frequency}</p>}
+                          {trigger && <p className="text-xs text-muted-foreground mt-0.5">{trigger}</p>}
+                        </div>
+                        {amountText && <p className="text-[14px] text-white font-bold whitespace-nowrap">{amountText}</p>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </GroupAccordion>
+            );
+          })}
 
       {durationFacts.length > 0 && (
         <GroupAccordion

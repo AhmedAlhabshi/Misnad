@@ -190,6 +190,50 @@ function ReportDocument({ data }: { data: ReportSummaryData }) {
           </View>
         )}
 
+        {data.employmentPersonalized && (
+          <View style={styles.section} wrap={false}>
+            <Text style={styles.sectionTitle}>{copy.personalizedTitle}</Text>
+            <View>
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>{copy.employmentPersonalized.incomeBefore}</Text>
+                <Text style={styles.tableValue}>{data.employmentPersonalized.incomeBefore}</Text>
+              </View>
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>{copy.employmentPersonalized.incomeAfter}</Text>
+                <Text style={styles.tableValue}>{data.employmentPersonalized.incomeAfter}</Text>
+              </View>
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>{copy.employmentPersonalized.incomeChange}</Text>
+                <Text style={styles.tableValue}>{data.employmentPersonalized.incomeChange}</Text>
+              </View>
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>{copy.employmentPersonalized.incomeChangePercentage}</Text>
+                <Text style={styles.tableValue}>{data.employmentPersonalized.incomeChangePercentage}</Text>
+              </View>
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>{copy.employmentPersonalized.remainingBefore}</Text>
+                <Text style={styles.tableValue}>{data.employmentPersonalized.remainingBefore}</Text>
+              </View>
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>{copy.employmentPersonalized.remainingAfter}</Text>
+                <Text style={styles.tableValue}>{data.employmentPersonalized.remainingAfter}</Text>
+              </View>
+              <View style={styles.tableRow}>
+                <Text style={styles.tableLabel}>{copy.employmentPersonalized.savingsAfter}</Text>
+                <Text style={styles.tableValue}>{data.employmentPersonalized.savingsAfter}</Text>
+              </View>
+            </View>
+            <View style={{ marginTop: 10 }}>
+              <Text style={{ fontSize: 9, color: MUTED_GRAY, marginBottom: 4, textAlign: isRtl ? "right" : "left" }}>
+                {copy.employmentPersonalized.conclusionLabel}
+              </Text>
+              <View style={styles.paragraphBox}>
+                <Text style={styles.paragraphText}>{data.employmentPersonalized.conclusion}</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
         <View style={styles.footer} fixed>
           <Text style={styles.footerText}>{copy.footerDisclaimer}</Text>
           <Text
@@ -206,7 +250,12 @@ function ReportDocument({ data }: { data: ReportSummaryData }) {
 export function buildReportFileName(data: ReportSummaryData): string {
   const datePart = data.generatedAt.slice(0, 10); // YYYY-MM-DD
   const base = data.language === "ar" ? "خلاصة-تحليل-العقد" : "misnad-contract-summary";
-  const suffix = data.personalized ? (data.language === "ar" ? "الخلاصة-والتحليل-الشخصي" : "with-personalized-analysis") : "";
+  const suffix =
+    data.personalized || data.employmentPersonalized
+      ? data.language === "ar"
+        ? "الخلاصة-والتحليل-الشخصي"
+        : "with-personalized-analysis"
+      : "";
   return suffix ? `${base}-${suffix}-${datePart}.pdf` : `${base}-${datePart}.pdf`;
 }
 

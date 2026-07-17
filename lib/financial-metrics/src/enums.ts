@@ -92,6 +92,14 @@ export const FINANCIAL_ROLE_VALUES = [
   "rate_or_percentage",
   "informational_total",
   "deduction",
+  /**
+   * A conditional amount that flows TO the user rather than being owed BY
+   * them — e.g. an employment contract's performance bonus, discretionary
+   * bonus, or an employer-paid termination-without-cause compensation.
+   * Never a cost: distinct from `conditional_cost`, which is always a
+   * potential amount the user might owe.
+   */
+  "conditional_income",
   "other",
 ] as const;
 export const financialRoleSchema = z.enum(FINANCIAL_ROLE_VALUES);

@@ -1,6 +1,7 @@
 import type { AnalysisLanguage } from "@workspace/contract-types";
 import type { ContractAnalysisResult } from "@/types/analysis";
 import type { FinancialConceptItem } from "@/lib/financialConcepts";
+import type { EmploymentIncomeMode } from "@/lib/budgetImpact";
 import { getCanonicalConceptLabel } from "@/lib/financialMetricsCopy";
 import { sanitizeDisplayText } from "@/lib/textSanitization";
 import { deduplicateClauses } from "@/lib/clauseDedup";
@@ -46,6 +47,13 @@ export interface PersonalizedAnalysisRequestInput {
   totalCommitmentRatio: number | null;
   remainingSavings: number | null;
   emergencyCoverageMonths: number | null;
+  /** Required exactly when `analysis.contractType === "employment"` — the user's answer to the income-mode question. `null`/omitted for every other contract type. */
+  employmentIncomeMode?: EmploymentIncomeMode | null;
+  /** Employment-only canonical income figures — mirror `EmploymentBudgetImpactResult`'s `incomeBefore`/`incomeAfter`/`incomeChange`/`incomeChangePercentage`. `null`/omitted for every other contract type. */
+  incomeBefore?: number | null;
+  incomeAfter?: number | null;
+  incomeChange?: number | null;
+  incomeChangePercentage?: number | null;
 }
 
 function isWellFormedPersonalizedAnalysisResponse(body: unknown): body is { success: boolean; analysis?: unknown } {
@@ -125,6 +133,7 @@ export async function fetchPersonalizedAnalysis(
       contractSummary: sanitizeDisplayText(input.analysis.contractSummary) ?? "",
       clauses: buildClausePayload(input.analysis),
       financialConcepts: buildConceptsPayload(input.concepts, input.language),
+      employmentIncomeMode: input.employmentIncomeMode ?? null,
       budgetMetrics: {
         monthlyIncome: input.budgetInputs.monthlyIncome,
         essentialExpenses: input.budgetInputs.essentialExpenses,
@@ -139,6 +148,10 @@ export async function fetchPersonalizedAnalysis(
         totalCommitmentRatio: input.totalCommitmentRatio,
         remainingSavings: input.remainingSavings,
         emergencyCoverageMonths: input.emergencyCoverageMonths,
+        incomeBefore: input.incomeBefore ?? null,
+        incomeAfter: input.incomeAfter ?? null,
+        incomeChange: input.incomeChange ?? null,
+        incomeChangePercentage: input.incomeChangePercentage ?? null,
       },
     };
 

@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import type { BudgetImpactResult } from "@/lib/budgetImpact";
+import type { BudgetImpactResult, EmploymentBudgetImpactResult, EmploymentIncomeMode } from "@/lib/budgetImpact";
 import type { PersonalizedAnalysisResponse } from "@/lib/personalizedAnalysisApi";
 
 export interface PersonalizedAnalysisFormState {
@@ -21,8 +21,18 @@ export type PersonalizedAnalysisStatus = "idle" | "loading" | "success" | "unava
 export interface PersonalizedAnalysisSessionState {
   /** Raw string form inputs — preserved verbatim so re-showing the form after "edit" looks unchanged. */
   form: PersonalizedAnalysisFormState;
-  /** The deterministic Budget Impact calculation, present once the user has submitted the form. */
+  /** The deterministic Budget Impact calculation, present once the user has submitted the form. Unused for `contractType === "employment"` — see `employmentBudgetResult` instead. */
   budgetResult: BudgetImpactResult | null;
+  /**
+   * The user's answer to "how will this contract salary affect your
+   * current income?" — required before an employment analysis can run
+   * (see `hasMinimumBudgetInputs`'s employment-only counterpart in
+   * `FinancialAnalysisTab.tsx`). `null` for every non-employment contract,
+   * and `null` until the user picks one for an employment contract.
+   */
+  employmentIncomeMode: EmploymentIncomeMode | null;
+  /** The deterministic employment income-impact calculation — parallel to `budgetResult`, used only for `contractType === "employment"`. */
+  employmentBudgetResult: EmploymentBudgetImpactResult | null;
   status: PersonalizedAnalysisStatus;
   /** The completed AI personalized-analysis result, present only when `status === "success"`. */
   result: PersonalizedAnalysisResponse | null;
@@ -31,6 +41,8 @@ export interface PersonalizedAnalysisSessionState {
 const INITIAL_STATE: PersonalizedAnalysisSessionState = {
   form: EMPTY_PERSONALIZED_ANALYSIS_FORM,
   budgetResult: null,
+  employmentIncomeMode: null,
+  employmentBudgetResult: null,
   status: "idle",
   result: null,
 };
@@ -88,6 +100,28 @@ export function usePersonalizedAnalysisSession(sessionKey: unknown) {
     setState((prev) => ({ ...prev, budgetResult }));
   }, []);
 
+  const setEmploymentBudgetResult = useCallback((employmentBudgetResult: EmploymentBudgetImpactResult) => {
+    setState((prev) => ({ ...prev, employmentBudgetResult }));
+  }, []);
+
+  /**
+   * Changing the mode always discards any prior employment result/AI
+   * analysis for this session — the two modes produce genuinely different
+   * figures, so a stale result under the previous mode must never linger
+   * (this is what "changing the mode triggers a fresh analysis" means:
+   * the user must submit again, but never sees the old mode's numbers
+   * mislabeled as the new mode's).
+   */
+  const setEmploymentIncomeMode = useCallback((employmentIncomeMode: EmploymentIncomeMode) => {
+    setState((prev) => ({
+      ...prev,
+      employmentIncomeMode,
+      employmentBudgetResult: null,
+      status: "idle",
+      result: null,
+    }));
+  }, []);
+
   /** Marks the AI personalized-analysis request as in flight — call once, right when it starts. */
   const startPersonalizedAnalysis = useCallback(() => {
     setState((prev) => ({ ...prev, status: "loading", result: null }));
@@ -101,15 +135,17 @@ export function usePersonalizedAnalysisSession(sessionKey: unknown) {
     setState((prev) => ({ ...prev, status: "unavailable", result: null }));
   }, []);
 
-  /** Used when the user clicks "edit inputs": discards the stale budget result and AI analysis so the next submission starts clean, but deliberately keeps `form` so their previously-typed values remain editable. */
+  /** Used when the user clicks "edit inputs": discards the stale budget result and AI analysis so the next submission starts clean, but deliberately keeps `form`/`employmentIncomeMode` so their previously-entered values remain editable. */
   const resetBudgetResult = useCallback(() => {
-    setState((prev) => ({ ...prev, budgetResult: null, status: "idle", result: null }));
+    setState((prev) => ({ ...prev, budgetResult: null, employmentBudgetResult: null, status: "idle", result: null }));
   }, []);
 
   return {
     state,
     setForm,
     setBudgetResult,
+    setEmploymentBudgetResult,
+    setEmploymentIncomeMode,
     startPersonalizedAnalysis,
     setPersonalizedAnalysisResult,
     setPersonalizedAnalysisUnavailable,

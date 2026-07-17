@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import {
   calculateBudgetImpact,
+  calculateEmploymentBudgetImpact,
   hasMinimumBudgetInputs,
   parseBudgetInputValue,
   type BudgetImpactInputs,
   type ContractBudgetFigures,
+  type EmploymentBudgetImpactInputs,
+  type EmploymentContractFigures,
 } from "../budgetImpact";
 
 export function run(): void {
@@ -91,6 +94,132 @@ export function run(): void {
   assert.equal(parseBudgetInputValue("-500"), null, "a negative amount is never a valid financial input here");
   assert.equal(parseBudgetInputValue("0"), 0, "zero is a valid, real value — distinct from 'not entered'");
   console.log("PASS parseBudgetInputValue parses safely, rejecting empty/invalid/negative input");
+
+  // --- calculateEmploymentBudgetImpact: replace_current_income mode -------
+  // Exact spec example: income 10,000, expenses 4,000, debts 1,000, savings
+  // 30,000; contract salary 12,000.
+  {
+    const inputs: EmploymentBudgetImpactInputs = {
+      currentMonthlyIncome: 10000,
+      monthlyLivingExpenses: 4000,
+      monthlyDebtPayments: 1000,
+      savings: 30000,
+    };
+    const contract: EmploymentContractFigures = {
+      guaranteedMonthlyIncome: 12000,
+      confirmedRecurringEmployeeDeductions: 0,
+      upfrontEmployeePayment: null,
+    };
+    const result = calculateEmploymentBudgetImpact(inputs, contract, "replace_current_income");
+    assert.equal(result.incomeBefore, 10000);
+    assert.equal(result.incomeAfter, 12000, "the new guaranteed salary replaces current income, never adds to it");
+    assert.equal(result.incomeChange, 2000, "12000 - 10000 = 2000");
+    assert.equal(result.remainingBefore, 5000, "10000 - 4000 - 1000 = 5000");
+    assert.equal(result.remainingAfter, 7000, "12000 - 4000 - 1000 = 7000 — the salary is never treated as an expense");
+    assert.equal(result.savingsAfterContract, 30000, "an employment salary must never reduce savings");
+    assert.equal(result.incomeChangePercentage, 20, "2000 / 10000 * 100 = 20%");
+  }
+  console.log("PASS calculateEmploymentBudgetImpact: replace_current_income matches the exact spec example");
+
+  // --- calculateEmploymentBudgetImpact: add_to_current_income mode --------
+  // Same inputs, additional-income mode.
+  {
+    const inputs: EmploymentBudgetImpactInputs = {
+      currentMonthlyIncome: 10000,
+      monthlyLivingExpenses: 4000,
+      monthlyDebtPayments: 1000,
+      savings: 30000,
+    };
+    const contract: EmploymentContractFigures = {
+      guaranteedMonthlyIncome: 12000,
+      confirmedRecurringEmployeeDeductions: 0,
+      upfrontEmployeePayment: null,
+    };
+    const result = calculateEmploymentBudgetImpact(inputs, contract, "add_to_current_income");
+    assert.equal(result.incomeBefore, 10000);
+    assert.equal(result.incomeAfter, 22000, "10000 + 12000 = 22000 — the two incomes are combined, never replaced");
+    assert.equal(result.incomeChange, 12000, "the full guaranteed salary is the income change in additional-income mode");
+    assert.equal(result.remainingBefore, 5000);
+    assert.equal(result.remainingAfter, 17000, "22000 - 4000 - 1000 = 17000");
+    assert.equal(result.savingsAfterContract, 30000, "an employment salary must never reduce savings, in either mode");
+    assert.equal(result.incomeChangePercentage, 120, "12000 / 10000 * 100 = 120%");
+  }
+  console.log("PASS calculateEmploymentBudgetImpact: add_to_current_income matches the exact spec example");
+
+  // --- current income = 0: never NaN/Infinity, percentage is null (UI shows "Unavailable") ---
+  {
+    const inputs: EmploymentBudgetImpactInputs = {
+      currentMonthlyIncome: 0,
+      monthlyLivingExpenses: 1000,
+      monthlyDebtPayments: 0,
+      savings: 5000,
+    };
+    const contract: EmploymentContractFigures = {
+      guaranteedMonthlyIncome: 8000,
+      confirmedRecurringEmployeeDeductions: 0,
+      upfrontEmployeePayment: null,
+    };
+    const replaceResult = calculateEmploymentBudgetImpact(inputs, contract, "replace_current_income");
+    assert.equal(replaceResult.incomeChangePercentage, null, "division by a zero current income must never produce NaN/Infinity");
+    assert.ok(Number.isFinite(replaceResult.incomeAfter!), "incomeAfter must stay a real finite number even when current income is 0");
+
+    const addResult = calculateEmploymentBudgetImpact(inputs, contract, "add_to_current_income");
+    assert.equal(addResult.incomeChangePercentage, null, "additional-income mode must also guard against division by zero");
+  }
+  console.log("PASS calculateEmploymentBudgetImpact: current income of 0 never produces NaN/Infinity");
+
+  // --- upfront employee payment: only subtracted when the contract actually states one ---
+  {
+    const inputs: EmploymentBudgetImpactInputs = {
+      currentMonthlyIncome: 10000,
+      monthlyLivingExpenses: 4000,
+      monthlyDebtPayments: 1000,
+      savings: 30000,
+    };
+    const noUpfront: EmploymentContractFigures = {
+      guaranteedMonthlyIncome: 12000,
+      confirmedRecurringEmployeeDeductions: 0,
+      upfrontEmployeePayment: null,
+    };
+    assert.equal(
+      calculateEmploymentBudgetImpact(inputs, noUpfront, "replace_current_income").savingsAfterContract,
+      30000,
+      "no upfront employee payment stated -> savings must be untouched",
+    );
+
+    const withUpfront: EmploymentContractFigures = {
+      guaranteedMonthlyIncome: 12000,
+      confirmedRecurringEmployeeDeductions: 0,
+      upfrontEmployeePayment: 2000,
+    };
+    assert.equal(
+      calculateEmploymentBudgetImpact(inputs, withUpfront, "replace_current_income").savingsAfterContract,
+      28000,
+      "an explicitly stated upfront employee payment is the only thing allowed to reduce savings",
+    );
+  }
+  console.log("PASS calculateEmploymentBudgetImpact: savings only reduced by an explicit upfront employee payment");
+
+  // --- confirmedRecurringEmployeeDeductions affect remainingAfter and emergency coverage, never remainingBefore ---
+  {
+    const inputs: EmploymentBudgetImpactInputs = {
+      currentMonthlyIncome: 10000,
+      monthlyLivingExpenses: 4000,
+      monthlyDebtPayments: 1000,
+      savings: 30000,
+    };
+    const contract: EmploymentContractFigures = {
+      guaranteedMonthlyIncome: 12000,
+      confirmedRecurringEmployeeDeductions: 500,
+      upfrontEmployeePayment: null,
+    };
+    const result = calculateEmploymentBudgetImpact(inputs, contract, "replace_current_income");
+    assert.equal(result.remainingBefore, 5000, "confirmed deductions never apply before the contract exists");
+    assert.equal(result.remainingAfter, 6500, "12000 - 4000 - 1000 - 500 = 6500");
+    // monthlyRequiredOutflow = 4000 + 1000 + 500 = 5500; 30000 / 5500 rounded to 1 decimal.
+    assert.equal(result.emergencyFundCoverageMonths, Math.round((30000 / 5500) * 10) / 10);
+  }
+  console.log("PASS calculateEmploymentBudgetImpact: confirmed recurring deductions affect remainingAfter and emergency coverage only");
 
   console.log("PASS budgetImpact.test.ts");
 }

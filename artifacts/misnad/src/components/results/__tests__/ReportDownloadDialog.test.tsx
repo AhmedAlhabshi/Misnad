@@ -35,12 +35,16 @@ function baseAnalysis(): ContractAnalysisResult {
 const IDLE_SESSION: PersonalizedAnalysisSessionState = {
   form: { monthlyIncome: "", essentialExpenses: "", existingDebt: "", savings: "" },
   budgetResult: null,
+  employmentIncomeMode: null,
+  employmentBudgetResult: null,
   status: "idle",
   result: null,
 };
 
 const COMPLETED_SESSION: PersonalizedAnalysisSessionState = {
   form: { monthlyIncome: "10000", essentialExpenses: "3000", existingDebt: "500", savings: "20000" },
+  employmentIncomeMode: null,
+  employmentBudgetResult: null,
   budgetResult: {
     availableBeforeContract: 6500,
     availableAfterContract: 4100,
@@ -48,6 +52,16 @@ const COMPLETED_SESSION: PersonalizedAnalysisSessionState = {
     totalCommitmentRatio: 29,
     remainingSavings: 15650,
     emergencyCoverageMonths: 2.5,
+    monthlyContractCommitment: 2400,
+    totalMonthlyOutflowBeforeContract: 3500,
+    totalMonthlyOutflowAfterContract: 5900,
+    remainingMonthlyBeforeContract: 6500,
+    remainingMonthlyAfterContract: 4100,
+    newContractBurdenRatio: 24,
+    totalOutflowRatioAfterContract: 59,
+    initialCashRequired: 4350,
+    savingsAfterInitialCash: 15650,
+    emergencyFundCoverageMonths: 2.7,
   },
   status: "success",
   result: { personalImpact: [{ title: "Affordable", explanation: "Fits your budget.", basis: "budget" }], thingsToWatch: [], beforeYouSign: [] },

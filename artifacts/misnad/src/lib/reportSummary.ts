@@ -37,6 +37,7 @@ export interface ReportSummaryData {
   keyFinancialFigures: Array<{ key: string; label: string; value: string }>;
   importantFindings: Array<{ title: string; summary: string; riskLevel?: RiskLevel | null }>;
   conclusion: string;
+  /** Generic (non-employment) personalized-analysis section — mutually exclusive with `employmentPersonalized` below. */
   personalized?: {
     monthlyIncome: string;
     existingMonthlyObligations: string;
@@ -44,6 +45,23 @@ export interface ReportSummaryData {
     totalMonthlyObligations: string;
     obligationToIncomeRatio: string;
     remainingMonthlyAmount: string;
+    conclusion: string;
+  };
+  /**
+   * Employment's own personalized-analysis section — replaces `personalized`
+   * above for `contractType === "employment"` (that generic shape frames
+   * every figure as an obligation/ratio, which is never correct for a
+   * salary). Reads from `PersonalizedAnalysisSessionState.employmentBudgetResult`
+   * instead of `budgetResult`.
+   */
+  employmentPersonalized?: {
+    incomeBefore: string;
+    incomeAfter: string;
+    incomeChange: string;
+    incomeChangePercentage: string;
+    remainingBefore: string;
+    remainingAfter: string;
+    savingsAfter: string;
     conclusion: string;
   };
 }
@@ -244,6 +262,9 @@ function buildPersonalizedSection(
   language: AnalysisLanguage,
   unavailableLabel: string,
 ): ReportSummaryData["personalized"] | undefined {
+  if (contractType === "employment") {
+    return undefined;
+  }
   if (session.status !== "success" || !session.result || !session.budgetResult) {
     return undefined;
   }
@@ -275,6 +296,43 @@ function buildPersonalizedSection(
       language,
       unavailableLabel,
     ).text,
+    conclusion: pickPersonalizedConclusion(session, language),
+  };
+}
+
+/**
+ * Employment's own PDF-section builder — parallel to `buildPersonalizedSection`
+ * but reads `employmentBudgetResult` instead of `budgetResult`, and never
+ * frames any figure as an obligation/ratio (see `ReportSummaryData
+ * .employmentPersonalized`'s doc comment).
+ */
+function buildEmploymentPersonalizedSection(
+  session: PersonalizedAnalysisSessionState,
+  financialMetrics: FinancialMetrics | null,
+  language: AnalysisLanguage,
+  unavailableLabel: string,
+): ReportSummaryData["employmentPersonalized"] | undefined {
+  if (session.status !== "success" || !session.result || !session.employmentBudgetResult) {
+    return undefined;
+  }
+
+  const currency = financialMetrics?.currency ?? null;
+  const percentSign = PERCENT_SIGN[language];
+  const r = session.employmentBudgetResult;
+
+  return {
+    incomeBefore: formatMoneyMetric({ value: r.incomeBefore, currency, reason: null }, language, unavailableLabel).text,
+    incomeAfter: formatMoneyMetric({ value: r.incomeAfter, currency, reason: null }, language, unavailableLabel).text,
+    incomeChange: formatMoneyMetric({ value: r.incomeChange, currency, reason: null }, language, unavailableLabel).text,
+    incomeChangePercentage: formatPercentageMetric(
+      { value: r.incomeChangePercentage, reason: null },
+      language,
+      unavailableLabel,
+      percentSign,
+    ).text,
+    remainingBefore: formatMoneyMetric({ value: r.remainingBefore, currency, reason: null }, language, unavailableLabel).text,
+    remainingAfter: formatMoneyMetric({ value: r.remainingAfter, currency, reason: null }, language, unavailableLabel).text,
+    savingsAfter: formatMoneyMetric({ value: r.savingsAfterContract, currency, reason: null }, language, unavailableLabel).text,
     conclusion: pickPersonalizedConclusion(session, language),
   };
 }
@@ -334,7 +392,11 @@ export function buildReportSummaryData(input: BuildReportSummaryDataInput): Repo
 
   const canIncludePersonalized = includePersonalized && personalizedSession.status === "success" && personalizedSession.result !== null;
   if (canIncludePersonalized) {
-    data.personalized = buildPersonalizedSection(personalizedSession, financialMetrics, analysis.contractType, language, copy.unavailable);
+    if (analysis.contractType === "employment") {
+      data.employmentPersonalized = buildEmploymentPersonalizedSection(personalizedSession, financialMetrics, language, copy.unavailable);
+    } else {
+      data.personalized = buildPersonalizedSection(personalizedSession, financialMetrics, analysis.contractType, language, copy.unavailable);
+    }
   }
 
   return data;

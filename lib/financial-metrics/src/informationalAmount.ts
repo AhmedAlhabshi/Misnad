@@ -33,6 +33,41 @@ export const INFORMATIONAL_AMOUNT_TYPE_VALUES = [
    * type's schema has a dedicated "asset value" field.
    */
   "asset_value",
+  /**
+   * The same recurring obligation restated at a different cadence (e.g. a
+   * lease's annual rent, stated alongside its monthly rent) — arithmetically
+   * `monthly amount × 12`, confirmed by matching label/frequency evidence
+   * (see `pipeline/candidates.ts`'s `applyRecurringEquivalenceReclassification`).
+   * Never a second obligation: the canonical cadence (e.g. monthly rent)
+   * alone participates in `recurringCommitment`/`totalCost`; this is kept
+   * only so the contract's own restated figure is still visible.
+   */
+  "annual_equivalent",
+  /**
+   * A contract's own stated total amount due at signing/contract start
+   * (e.g. a lease's "Total due at signing: 7,050 SAR"), when its wording
+   * explicitly names the amount as due now rather than merely being a stated
+   * grand total for the whole contract (see `stated_total_cost` above, and
+   * `pipeline/classify.ts`'s `isStatedDueAtSigningText`).
+   */
+  "stated_due_at_signing",
+  /**
+   * One individual guaranteed, fixed salary component (base salary, a
+   * housing allowance, a transportation allowance, ...) for an employment
+   * contract — purely for the "compensation breakdown" display; the
+   * canonical total (`monthly_income`) is derived separately (see
+   * `pipeline/employmentClassification.ts`) so a component and the total
+   * are never both summed into guaranteed income.
+   */
+  "salary_component",
+  /**
+   * An employment contract's own explicitly stated total fixed monthly
+   * compensation (e.g. "Total fixed monthly compensation: 12,000 SAR"),
+   * preferred as the canonical guaranteed income when it is arithmetically
+   * consistent with the sum of the guaranteed salary components — see
+   * `pipeline/classify.ts`'s `isStatedTotalCompensationText`.
+   */
+  "total_fixed_compensation",
 ] as const;
 export const informationalAmountTypeSchema = z.enum(INFORMATIONAL_AMOUNT_TYPE_VALUES);
 export type InformationalAmountType = z.infer<typeof informationalAmountTypeSchema>;

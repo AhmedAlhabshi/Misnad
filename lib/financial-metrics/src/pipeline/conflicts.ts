@@ -4,15 +4,19 @@ import type { Candidate } from "./candidates";
 import { compareCandidatesByPriority } from "./priority";
 
 /**
- * `statedTotalCost` is the one `specialKey` that is NOT singular by
- * construction — a real contract can state more than one distinct grand
- * total under different names (e.g. "Total of Payments during the term" vs
- * "Total repayment amount"), and these are separate stated facts, not
- * conflicting reports of the same figure. Every other special key
- * (principal, credit limit, income, a deductible, a coverage amount, an
- * outstanding balance, a stated rate) genuinely is singular per contract.
+ * `statedTotalCost` and `salaryComponent` are the special keys that are NOT
+ * singular by construction: a real contract can state more than one
+ * distinct grand total under different names (e.g. "Total of Payments
+ * during the term" vs "Total repayment amount"), and an employment
+ * contract legitimately has multiple distinct guaranteed salary components
+ * (base salary, a housing allowance, a transportation allowance, ...) —
+ * these are separate stated facts, not conflicting reports of the same
+ * figure. Every other special key (principal, credit limit, income, a
+ * deductible, a coverage amount, an outstanding balance, a stated rate, a
+ * stated total due at signing, a recurring-obligation equivalent, a stated
+ * total fixed compensation) genuinely is singular per contract.
  */
-const NON_SINGULAR_SPECIAL_KEYS: ReadonlySet<string> = new Set(["statedTotalCost"]);
+const NON_SINGULAR_SPECIAL_KEYS: ReadonlySet<string> = new Set(["statedTotalCost", "salaryComponent"]);
 
 /**
  * Groups candidates that represent the *same metric slot*: most special
