@@ -101,10 +101,38 @@ const CONCEPT_ANCHORS: readonly ConceptAnchor[] = [
     fallbackTitle: "ملكية الأصل",
     keywords: ["ملكية المركبة", "ملكية العقار", "تسجيل المركبة", "تبقى المركبة مسجلة", "vehicle ownership", "title to the vehicle", "remains registered"],
   },
+  // Insurance is split into two anchors, not one — "included for year one"
+  // and "renewal cost in later years" are independently-effective facts
+  // (the first is a benefit bundled into the current price, the second is a
+  // future cost the customer bears alone) and must never collapse into a
+  // single generic "insurance" clause merely because both sentences mention
+  // insurance. Each anchor's keywords deliberately key on the differentiator
+  // (first year vs. renewal/later years), not on the shared word "insurance"
+  // itself, so a sentence naming only one of the two stays unambiguous.
   {
-    id: "insurance",
-    fallbackTitle: "التغطية التأمينية",
-    keywords: ["التأمين الشامل", "التغطية التأمينية", "تكلفة التأمين", "insurance coverage", "comprehensive insurance", "insurance cost"],
+    id: "insurance_first_year",
+    fallbackTitle: "التأمين للسنة الأولى",
+    keywords: [
+      "للسنة الأولى",
+      "السنة الأولى فقط",
+      "first year only",
+      "for the first year",
+      "included for the first year",
+      "first-year insurance",
+    ],
+  },
+  {
+    id: "insurance_renewal",
+    fallbackTitle: "تجديد التأمين للسنوات اللاحقة",
+    keywords: [
+      "تجديد التأمين",
+      "السنوات اللاحقة",
+      "السنوات التالية",
+      "insurance renewal",
+      "renewal for subsequent years",
+      "later years",
+      "subsequent years",
+    ],
   },
   // --- lease/subscription: renewal & cancellation -------------------------
   {

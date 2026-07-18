@@ -21,10 +21,16 @@ function clause(overrides: Partial<ImportantClause>): ImportantClause {
 
 /**
  * Real (test-only, fabricated identifiers) masked contract fragment — the
- * exact two sections that were observed to produce inconsistent clause
- * counts (4 vs 5) across separate live model runs of the same PDF. Kept
- * verbatim (not paraphrased) so this regression test exercises the actual
- * text shape that triggered the bug.
+ * exact two sections that were observed to produce inconsistent and
+ * incomplete clause counts across separate live model runs of the same PDF
+ * (as few as 3 clauses in one observed run, collapsing several independent
+ * facts — delayed-payment notice, collection-cost cap, early settlement,
+ * vehicle ownership, first-year insurance inclusion, later-year insurance
+ * renewal cost — down to only "early settlement", "insurance", and "vehicle
+ * ownership"). Kept verbatim (not paraphrased) so this regression test
+ * exercises the actual text shape that triggered the bug. This is the
+ * auto-finance fixture required by the "incomplete importantClauses
+ * extraction" regression requirement — see `assertSixIndependentEffectsAreSeparate`.
  */
 const REAL_FIXTURE_MASKED_TEXT = `الجهة الممولةشركة الأفق للتمويل - سجل [NATIONAL_ID]
 العميلسلمان فهد التجريبي - هوية [NATIONAL_ID] - جوال [PHONE]
@@ -41,10 +47,10 @@ const REAL_FIXTURE_MASKED_TEXT = `الجهة الممولةشركة الأفق �
 
 /**
  * A raw model response that bundles each entire section into ONE clause —
- * i.e. the "4 clauses" (or fewer) failure mode: two independently-effective
- * paragraphs (late payment + collection cost + early settlement; ownership
- * + insurance) each collapsed into a single clause instead of being split
- * per independent effect.
+ * the under-extraction failure mode: two independently-effective paragraphs
+ * (late payment + collection cost + early settlement; ownership + first-year
+ * insurance + later-year insurance renewal) each collapsed into a single
+ * clause instead of being split per independent effect.
  */
 const MERGED_RAW_CLAUSES: ImportantClause[] = [
   clause({
@@ -64,9 +70,12 @@ const MERGED_RAW_CLAUSES: ImportantClause[] = [
 ];
 
 /**
- * A raw model response that already split each independent effect into its
- * own clause — the "5 clauses" (correct) outcome from one real live run.
- * Kept exactly as the model produced it (see the investigation's RUN 1).
+ * A raw model response that already split most independent effects into
+ * their own clause — the "5 clauses" outcome from one real live run, which
+ * still bundles first-year insurance inclusion and later-year insurance
+ * renewal cost into one "تغطية التأمين الشامل" clause. Kept exactly as the
+ * model produced it (see the investigation's RUN 1) — post-processing must
+ * still split that one remaining bundled clause to reach the full 6.
  */
 const ALREADY_SPLIT_RAW_CLAUSES: ImportantClause[] = [
   clause({
@@ -198,11 +207,11 @@ function indicesContaining(clauses: readonly ImportantClause[], keyword: string)
 }
 
 /**
- * Generic two-concept version of `assertFiveIndependentEffectsAreSeparate`,
+ * Generic two-concept version of `assertSixIndependentEffectsAreSeparate`,
  * used for the additional concept pairs required beyond the original
  * vehicle-finance fixture (auto-renewal/cancellation, termination
  * notice/fee, maintenance/damage compensation) — proves the split mechanism
- * is not special-cased to the original 5 concepts.
+ * is not special-cased to the original vehicle-finance concepts.
  */
 function assertTwoIndependentEffectsAreSeparate(
   clauses: readonly ImportantClause[],
@@ -217,41 +226,46 @@ function assertTwoIndependentEffectsAreSeparate(
   assert.notEqual(aIndices[0], bIndices[0], `${a.label} and ${b.label} must not be merged into the same clause`);
 }
 
-function assertFiveIndependentEffectsAreSeparate(clauses: readonly ImportantClause[]): void {
-  assert.equal(clauses.length, 5, `expected exactly 5 clauses, got ${clauses.length}`);
+/**
+ * Verifies all 6 independently-effective facts in the auto-finance fixture
+ * are each their own clause: delayed-payment notice, collection costs,
+ * early settlement, vehicle ownership, first-year insurance inclusion, and
+ * later-year insurance renewal cost. The last two used to collapse into one
+ * generic "insurance" clause (5-clause outcome) — first-year inclusion (a
+ * benefit bundled into the current price) and later-year renewal (a future
+ * cost the customer bears alone) are independently-effective facts and must
+ * never merge merely because both sentences mention insurance.
+ */
+function assertSixIndependentEffectsAreSeparate(clauses: readonly ImportantClause[]): void {
+  assert.ok(clauses.length >= 6, `expected at least 6 clauses, got ${clauses.length}`);
 
   const latePayment = indicesContaining(clauses, "التأخر عن سداد");
   const collectionCost = indicesContaining(clauses, "تكاليف التحصيل");
   const earlySettlement = indicesContaining(clauses, "السداد المبكر");
   const ownership = indicesContaining(clauses, "تبقى المركبة مسجلة");
-  const insurance = indicesContaining(clauses, "التأمين الشامل");
+  const insuranceFirstYear = indicesContaining(clauses, "للسنة الأولى");
+  const insuranceRenewal = indicesContaining(clauses, "تجديد التأمين");
 
   for (const [name, indices] of [
     ["late payment", latePayment],
     ["collection cost", collectionCost],
     ["early settlement", earlySettlement],
     ["ownership", ownership],
-    ["insurance", insurance],
+    ["first-year insurance inclusion", insuranceFirstYear],
+    ["later-year insurance renewal cost", insuranceRenewal],
   ] as const) {
     assert.equal(indices.length, 1, `${name} concept must appear in exactly one clause, found in ${indices.length}`);
   }
 
-  assert.notEqual(
+  const distinctIndices = new Set([
     latePayment[0],
     collectionCost[0],
-    "late payment and collection costs must not be merged into the same clause",
-  );
-  assert.notEqual(
-    latePayment[0],
     earlySettlement[0],
-    "early settlement must remain a separate clause from late payment",
-  );
-  assert.notEqual(
-    collectionCost[0],
-    earlySettlement[0],
-    "early settlement must remain a separate clause from collection costs",
-  );
-  assert.notEqual(ownership[0], insurance[0], "ownership and insurance must remain separate clauses");
+    ownership[0],
+    insuranceFirstYear[0],
+    insuranceRenewal[0],
+  ]);
+  assert.equal(distinctIndices.size, 6, "all 6 independent facts must land in 6 different clauses, never merged pairwise");
 }
 
 function run(): void {
@@ -270,7 +284,7 @@ function run(): void {
 
   // --- splitCompoundClauses: the two real merged sections split correctly
   const splitFromMerged = splitCompoundClauses(MERGED_RAW_CLAUSES);
-  assertFiveIndependentEffectsAreSeparate(splitFromMerged);
+  assertSixIndependentEffectsAreSeparate(splitFromMerged);
 
   // --- deduplicateEquivalentClauses: genuine duplicates collapse ---------
   const genuineDuplicate = clause({
@@ -324,15 +338,24 @@ function run(): void {
   );
 
   // --- applyDeterministicClausePostProcessing: fixture-based end-to-end --
+  // This is the auto-finance regression fixture for the "incomplete
+  // importantClauses extraction" bug: whether the model fully merges every
+  // independent effect (MERGED_RAW_CLAUSES) or already splits most of them
+  // but still bundles the two insurance facts together (ALREADY_SPLIT_RAW_CLAUSES),
+  // deterministic post-processing must converge both to the same 6 clauses:
+  // delayed-payment notice, collection costs, early settlement, vehicle
+  // ownership, first-year insurance inclusion, and later-year insurance
+  // renewal cost — never collapsing to only 3.
   const fromMerged = applyDeterministicClausePostProcessing(MERGED_RAW_CLAUSES, REAL_FIXTURE_MASKED_TEXT);
-  assertFiveIndependentEffectsAreSeparate(fromMerged);
+  assertSixIndependentEffectsAreSeparate(fromMerged);
 
   const fromAlreadySplit = applyDeterministicClausePostProcessing(ALREADY_SPLIT_RAW_CLAUSES, REAL_FIXTURE_MASKED_TEXT);
-  assertFiveIndependentEffectsAreSeparate(fromAlreadySplit);
-  // Both raw variants that caused the 4-vs-5 inconsistency (fully merged vs.
-  // already split by the model) converge to 5 clauses with each of the 5
-  // independent effects isolated to its own clause — verified above by
-  // assertFiveIndependentEffectsAreSeparate for each input independently.
+  assertSixIndependentEffectsAreSeparate(fromAlreadySplit);
+  // Both raw variants that caused the under-extraction inconsistency (fully
+  // merged vs. already split by the model) converge to 6 clauses with each
+  // of the 6 independent effects isolated to its own clause — verified
+  // above by assertSixIndependentEffectsAreSeparate for each input
+  // independently.
 
   // --- idempotence: re-running on already-processed output is a no-op ----
   const processedTwice = applyDeterministicClausePostProcessing(fromMerged, REAL_FIXTURE_MASKED_TEXT);
